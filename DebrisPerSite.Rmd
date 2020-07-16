@@ -1,0 +1,162 @@
+---
+title: "DebrisPerSite"
+author: "Brie Sherow"
+date: "15/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r figure-setup, echo=FALSE, include=FALSE} 
+knitr::opts_chunk$set(fig.path="Output/", fig.width=6.5,fig.height=4, fig.align="center")
+```
+
+```{r load libraries, echo=FALSE, include=FALSE}
+lib.load = c("here", "ggplot2", "dplyr", "lubridate") 
+lapply(lib.load, require, character.only = TRUE) 
+
+```
+
+```{r load data}
+#set working directory
+setwd("~/Desktop/Marine Debris/R-project")
+getwd()
+
+#Check working directory
+here::here()
+
+#Load data, assign date to date and notes to character
+data <- read.csv(file="Data/all_data.csv", header=T, sep=",")
+data$Date <- dmy(data$Date)
+data$Notes <- as.character(data$Notes)
+
+glimpse(data)
+```
+
+
+```{r filter sites}
+#filtering for sites surveyed at least 3 times and by UNSW teams
+site_select <- data %>%
+  filter(Team=="UNSW" & Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT","ATHOL")) %>%
+  select(-Habitat2, -Fragment, -Whole)
+```
+
+```{r normalise survey count}
+#create a count for number of surveys
+sampling_dates <- data %>%
+  group_by(Location) %>%
+  filter(Team=="UNSW") %>%
+  count(Date)
+
+#take away the debris count
+sampling_dates$n <- NULL
+
+sampling_visits <- sampling_dates %>%
+  count(Location) %>%
+  arrange(desc(n)) %>%
+  rename(NumberSurveys=n)
+
+#join survey to site select
+site_select <- left_join(site_select, sampling_visits, by="Location")
+
+#add unique event id
+site_select <- site_select %>%
+  mutate(Event_ID=paste(Date, Site))
+
+```
+
+```{r plot setup}
+#Total item count of all IDs per survey event
+event_total <- site_select %>%
+  group_by(Event_ID) %>%
+  mutate(event_sum=sum(Total), #total debris count per event
+         event_prop=Total/event_sum)%>%  #total number of all items per survey event
+  ungroup()
+
+#normalise sites
+site_total <- event_total %>%
+  group_by(Site, ID) %>%
+  mutate(mean_prop=sum(event_prop)/NumberSurveys, #mean of item type per site
+         proportion_sd=sd(event_prop)) %>% #sd of item type per site
+        ungroup()
+
+#remove unnecessary data for plotting
+site_plots <-
+  site_total %>%
+  filter(mean_prop>0) %>%
+  select(Site, Location, Habitat, ID, Material, mean_prop, proportion_sd) %>%
+  distinct()
+```
+
+```{r top item}
+#total item count per ID
+item_count <- site_plots %>%
+  count(ID) %>%
+  arrange(desc(n)) %>%
+  rename(IDCount=n)
+
+#join item count to site data
+site_plots <- left_join(site_plots, item_count, by="ID")
+
+#Total item count of all IDs per survey event
+item_total <- site_plots %>%
+  group_by(ID) %>%
+  mutate(ID_sum=sum(mean_prop), #sum the means in order to divide by count
+         ID_prop=ID_sum/IDCount)%>%  #overall mean of each item type
+  ungroup()
+```
+
+
+```{r load CSIRO code}
+#Load data, assign date to date and notes to character
+CSIRO_code <- read.csv(file="Data/CSIRO-code.csv", header=T, sep=",")
+CSIRO_code$item_name <- as.character(CSIRO_code$item_name)
+```
+
+
+```{r top item by pier}
+#top item by pier
+top_pier <- item_total %>%
+  filter(Habitat=="P") %>%
+  mutate(ID_prop2=paste(ID, ID_prop)) %>%
+  distinct(ID_prop2, .keep_all=TRUE) %>%
+slice_max(ID_prop, n=25) %>%
+  arrange(desc(ID_prop)) %>%
+  select(ID, Material, ID_prop)
+   
+#join CSIRO codes for item names
+top_pier <- left_join(top_pier, CSIRO_code, by="ID")
+```
+
+```{r top item by soft sediment}
+#top item by soft sediment
+top_ss <- item_total %>%
+  filter(Habitat=="SS") %>%
+  mutate(ID_prop2=paste(ID, ID_prop)) %>%
+  distinct(ID_prop2, .keep_all=TRUE) %>%
+slice_max(ID_prop, n=25) %>%
+  arrange(desc(ID_prop)) %>%
+  select(ID, Material, ID_prop)
+   
+#join CSIRO codes for item names
+top_ss <- left_join(top_ss, CSIRO_code, by="ID")
+```
+
+
+
+
+```{r}
+#Consolidating the four main material categories
+
+    
+ var_change <- c("Brick or Cement","Construction", "Organic", "Unknown", " ")
+ site_total$Material[site_total$Material %in% var_change] = "Other"
+    
+
+unique(site_total$Material)
+
+```
+
+
