@@ -90,9 +90,16 @@ site_plots <-
   distinct()
 ```
 
+<<<<<<< HEAD
 ```{r top item}
 #total item count per ID
 item_count <- site_plots %>%
+=======
+```{r top item by pier}
+#total item count per ID
+item_count_p <- site_plots %>%
+  filter(Habitat=="P") %>%
+>>>>>>> 23e1d32ee40dd700134982d66def262df2b11e3c
   count(ID) %>%
   arrange(desc(n)) %>%
   rename(IDCount=n)
