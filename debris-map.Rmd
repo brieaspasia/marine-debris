@@ -1,0 +1,62 @@
+---
+title: "debris-map"
+author: "Brie Sherow"
+date: "16/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r figure-setup, echo=FALSE, include=FALSE} 
+knitr::opts_chunk$set(fig.path="Output/", fig.width=6.5,fig.height=4, fig.align="center")
+```
+
+
+```{r load sites}
+Sites <- read.csv("Data/survey_coords.csv", header=T, sep=",")
+```
+
+```{r set buffer}
+buffer <- 0.01
+
+geo_bounds <- c(left = min(Sites$lon)-buffer, 
+                bottom = min(Sites$lat)-buffer, 
+                right = max(Sites$lon)+buffer, 
+                top = max(Sites$lat)+buffer)
+```
+
+```{r create spatial df}
+library(sp)
+Sites.grid <- expand.grid(lon_bound = c(geo_bounds[1], geo_bounds[3]), 
+                       lat_bound = c(geo_bounds[2], geo_bounds[4]))
+
+coordinates(Sites.grid) <- ~ lon_bound + lat_bound
+```
+
+```{r import aus coast shp}
+Aus <- readOGR(dsn = "Data/61395_shp/australia",layer = "cstauscd_r")
+Aus <- subset(Aus, FEAT_CODE != "sea")
+
+```
+
+```{r define map area}
+library(raster)
+Aus_crop <- crop(Aus, extent(Sites.grid))
+plot(Aus_crop)
+```
+```{r ggplot}
+library(ggplot2)
+
+ggplot() + 
+ geom_polygon(data = Aus_crop, aes(x=long, y=lat, group=group), fill="forestgreen", colour="black") +
+ coord_equal() +
+ 
+ geom_point(data=Sites, aes(x=lon, y=lat, shape=Habitat), colour="blue") +
+ 
+ labs(x="Longitude", y="Latitude") +
+ theme_classic()
+```
+
