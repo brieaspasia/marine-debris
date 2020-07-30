@@ -1,0 +1,91 @@
+ID,item_name
+H1,Pipe/PVC
+H2,Beverage bottle <1 L
+H3,Other bottle
+H4,Bottle cap/lid
+H5,Food container
+H6,Utensil/plate/bowl
+H7,Bucket/crate
+H8,Lighter
+H9,Lollipop stick/earbud
+H10,Unknown/other hard
+S1,Thin film carry bag
+S2,Food wrapper/label
+S3,Sheeting
+S4,Cup/lid
+S5,Straw
+S6,Unknown/other soft
+S7,Other plastic bag
+BP1,String/rope/ribbon
+BP2,Packing strap
+BP3,Cable ties
+BP4,Unknown/other strap
+M1,Pipe
+M2,Wire
+M3,Aerosol
+M4,Beverage can
+M5,Food can/tin
+M6,Lid/cap
+M7,Food wrapper
+M8,Aluminum foil
+M9,Bucket/drum
+M10,Unknown/other hard
+M11,Unknown/other soft
+G1,Beverage bottle
+G2,Jar
+G3,Light globe/tube
+G4,Unknown/other glass
+R1,Thong/shoe
+R2,Tyre
+R3,Balloon
+R4,Rubber band
+R5,Unknown/other
+C1,String/rope/strap
+C2,Clothing/towel
+C3,Wipes/cloths
+C4,Insulation/stuffing
+C5,Unknown/other
+T1,Wood/timber
+T2,Utensil/food stick
+T3,Bottle cork
+T4,Pallet
+T5,Unknown/other
+D1,Food container
+D2,Cup/plates/bowls
+D3,Polystyrene
+D4,Unknown/other
+P1,Cigarette butt
+P2,Paper/cardboard
+P3,Magazine/newspaper
+P4,Bag
+P5,Box
+P6,Food container/box
+P7,Food wrapper/bag
+P8,Beverage container
+P9,Cups
+P10,Plates/bowls
+P11,Unknown/other
+F1,Net
+F2,Fishing line
+F3,Fishing lures
+F4,buoys/floats
+F5,Glow stick
+F6,Fishhook/sinker
+F7,Unknown/other
+Z1,Battery
+Z2,Brick/cement
+Z3,Carpet
+Z4,Ceramic
+Z5,E-waste
+Z6,Furniture
+Z7,Appliances
+Z8,Large car parts
+Z9,Large boat parts
+Z10,Bag/box domestic waste
+Z11,Nurdles
+O1,Other
+O2,Other
+O3,Other
+O4,Other
+O5,Other
+O6,Other
