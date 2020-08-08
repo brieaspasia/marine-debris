@@ -1,0 +1,99 @@
+---
+title: "BarChart-Debris"
+author: "Brie Sherow"
+date: "04/08/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libraries, echo=FALSE, include=FALSE}
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats") 
+lapply(lib.load, require, character.only = TRUE) 
+
+```
+
+```{r load-data}
+site_select <- read.csv(file="Output/siteselect.csv", header=T, sep=",")
+site_select$Date <- as.Date(site_select$Date)
+site_select$Notes <- as.character(site_select$Notes)
+str(site_select)
+```
+```{r}
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
+```
+
+```{r pier-items}
+P <- site_select %>%
+  filter(Habitat=="P")
+
+total_P <- P %>%
+  group_by(Site, ID) %>%
+  summarise(item_total=sum(Total),
+            mean=item_total/NumberSurveys) %>%
+  arrange(desc(mean))
+
+total_P <- distinct(total_P)
+total_P <- left_join(total_P, item_code, by="ID")
+
+total_P <- total_P %>%
+  filter(mean>2)
+
+total_P %>%
+  mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
+  ggplot( aes(x=item_name, y=mean, fill=Material)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~Site)
+```
+
+
+```{r sediment-items}
+SS <- site_select %>%
+  filter(Habitat=="SS")
+
+total_SS <- SS %>%
+  group_by(Site, ID) %>%
+  summarise(item_total=sum(Total),
+            mean=item_total/NumberSurveys) %>%
+  arrange(desc(mean))
+
+total_SS <- distinct(total_SS)
+total_SS <- left_join(total_SS, item_code, by="ID")
+
+total_SS <- total_SS %>%
+  filter(mean>2)
+
+total_SS %>%
+  mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
+  ggplot( aes(x=item_name, y=mean, fill=Material)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~Site)
+```
+```{r fishing}
+fishing <- site_select %>%
+  group_by(Site, Fishing) %>%
+  summarise(item_total=sum(Total),
+            mean=item_total/NumberSurveys) %>%
+  arrange(desc(mean))
+
+fishing <- distinct(fishing)
+
+site_habitat <- select(site_select, c(Site, Habitat, Location))
+site_habitat <- distinct(site_habitat)
+fishing <- left_join(fishing, site_habitat, by="Site")
+
+fishing %>%
+  ggplot( aes(x=Fishing, y=mean, fill=Location)) +
+  geom_bar(position="dodge", stat="identity") +
+  facet_wrap(~Habitat)
+
+fishing %>%
+  ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
+  geom_bar(position="stack", stat="identity") +
+  facet_wrap(~Location)
+```
+

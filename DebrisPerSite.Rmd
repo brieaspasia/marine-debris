@@ -14,21 +14,20 @@ knitr::opts_chunk$set(fig.path="Output/", fig.width=6.5,fig.height=4, fig.align=
 ```
 
 ```{r load libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate") 
+lib.load = c("here", "ggplot2", "tidyverse", "lubridate") 
 lapply(lib.load, require, character.only = TRUE) 
-
 ```
 
 ```{r load data}
 #set working directory
-setwd("~/Desktop/Marine Debris/R-project")
+setwd("~/Desktop/Marine Debris/R-project/marine-debris")
 getwd()
 
 #Check working directory
 here::here()
 
 #Load data, assign date to date and notes to character
-data <- read.csv(file="Data/all_data.csv", header=T, sep=",")
+data <- read.csv(file="data/all_data.csv", header=T, sep=",")
 data$Date <- dmy(data$Date)
 data$Notes <- as.character(data$Notes)
 
@@ -65,6 +64,7 @@ site_select <- left_join(site_select, sampling_visits, by="Location")
 site_select <- site_select %>%
   mutate(Event_ID=paste(Date, Site))
 
+write.csv(site_select, file="Output/siteselect.csv")
 ```
 
 ```{r plot setup}
@@ -90,16 +90,15 @@ site_plots <-
   distinct()
 ```
 
-<<<<<<< HEAD
+
 ```{r top item}
 #total item count per ID
 item_count <- site_plots %>%
-=======
+
 ```{r top item by pier}
 #total item count per ID
 item_count_p <- site_plots %>%
   filter(Habitat=="P") %>%
->>>>>>> 23e1d32ee40dd700134982d66def262df2b11e3c
   count(ID) %>%
   arrange(desc(n)) %>%
   rename(IDCount=n)
