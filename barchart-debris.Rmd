@@ -25,6 +25,67 @@ str(site_select)
 item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 ```
 
+```{r item-counts}
+#normalise sites
+site_total_item <- site_select %>%
+  group_by(Site, ID) %>%
+  mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
+         mean_sd=sd(Total)) %>% #sd of item type per site
+        ungroup()
+
+site_total_item <- site_total_item %>%
+  select(Location, Habitat, Site, ID, mean, mean_sd) %>%
+  filter(mean > 0) %>%
+  distinct()
+  
+site_total_item <- left_join(site_total_item, item_code, by="ID")
+
+top_items_per_site <- site_total %>% group_by(Site) %>% top_n(3, mean)
+``` 
+
+```{r material-counts}
+#normalise sites
+site_total_mat <- site_select %>%
+  group_by(Site, Material) %>%
+  mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
+         mean_sd=sd(Total)) %>% #sd of item type per site
+        ungroup()
+
+site_total_mat <- site_total_mat %>%
+  select(Location, Habitat, Site, Material, mean, mean_sd) %>%
+  filter(mean > 0) %>%
+  distinct()
+
+#not working...
+# var_change <- c("Rubber", "Timber", "Cloth", "Ceramic", "Undetermined", "E-Waste", "Paper", "Brick or Cement")
+# 
+# site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other"
+
+top_mat_per_site <- site_total_mat %>% group_by(Site) %>% top_n(2, mean)
+
+``` 
+
+
+```{r by-material}
+var_change <- c("Rubber", "Timber", "Cloth", "Ceramic", "Undetermined", "E-Waste", "Paper", "Brick or Cement")
+    site_total$Material[site_total$Material %in% var_change] ="Other"
+```
+
+
+```{r rename-items}
+    # from = c("Plastic film remnants (bits of plastic bag, wrap etc)", "Miscellaneous paper, labels & tickets",
+    #          "Foam insulation & packaging (whole and remnants)", "Plastic bits & pieces hard & solid",
+    #          "Plastic packaging food (wrap, packets, containers)", "Plastic wrap non food (bubble wrap etc)")
+    # 
+    # to = c("Plastic film remnants", "Paper (Misc)","Foam insulation & packaging","Plastic pieces (solid)", "Plastic packaging (food)", "Plastic wrap (non-food)")
+    # 
+    # for(z in 1:length(from)){
+    #   
+    #   df.Qfilt$item = plyr::mapvalues(df.Qfilt$item, from = from[z], to = to[z])
+    #   
+    # }
+```
+        
 ```{r pier-items}
 P <- site_select %>%
   filter(Habitat=="P")
