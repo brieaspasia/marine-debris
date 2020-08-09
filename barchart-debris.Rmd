@@ -66,12 +66,6 @@ top_mat_per_site <- site_total_mat %>% group_by(Site) %>% top_n(2, mean)
 ``` 
 
 
-```{r by-material}
-var_change <- c("Rubber", "Timber", "Cloth", "Ceramic", "Undetermined", "E-Waste", "Paper", "Brick or Cement")
-    site_total$Material[site_total$Material %in% var_change] ="Other"
-```
-
-
 ```{r rename-items}
     # from = c("Plastic film remnants (bits of plastic bag, wrap etc)", "Miscellaneous paper, labels & tickets",
     #          "Foam insulation & packaging (whole and remnants)", "Plastic bits & pieces hard & solid",
