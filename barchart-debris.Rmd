@@ -15,6 +15,18 @@ lapply(lib.load, require, character.only = TRUE)
 
 ```
 
+```{r create-siteselect}
+data <- read.csv(file="data/all_data.csv", header=T, sep=",")
+data$Date <- dmy(data$Date)
+data$Notes <- as.character(data$Notes)
+
+site_select <- data %>%
+  filter(Team=="UNSW" & Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT","ATHOL")) %>%
+  select(-Habitat2, -Fragment, -Whole)
+
+```
+
+
 ```{r load-data}
 site_select <- read.csv(file="Output/siteselect.csv", header=T, sep=",")
 site_select$Date <- as.Date(site_select$Date)
