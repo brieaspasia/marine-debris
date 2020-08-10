@@ -15,7 +15,7 @@ lapply(lib.load, require, character.only = TRUE)
 
 ```
 
-```{r create-siteselect}
+```{r load-data}
 data <- read.csv(file="data/all_data.csv", header=T, sep=",")
 data$Date <- dmy(data$Date)
 data$Notes <- as.character(data$Notes)
@@ -26,14 +26,7 @@ site_select <- data %>%
 
 ```
 
-
-```{r load-data}
-site_select <- read.csv(file="Output/siteselect.csv", header=T, sep=",")
-site_select$Date <- as.Date(site_select$Date)
-site_select$Notes <- as.character(site_select$Notes)
-str(site_select)
-```
-```{r}
+```{r load-item-code}
 item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 ```
 
@@ -76,21 +69,6 @@ site_total_mat <- site_total_mat %>%
 top_mat_per_site <- site_total_mat %>% group_by(Site) %>% top_n(2, mean)
 
 ``` 
-
-
-```{r rename-items}
-    # from = c("Plastic film remnants (bits of plastic bag, wrap etc)", "Miscellaneous paper, labels & tickets",
-    #          "Foam insulation & packaging (whole and remnants)", "Plastic bits & pieces hard & solid",
-    #          "Plastic packaging food (wrap, packets, containers)", "Plastic wrap non food (bubble wrap etc)")
-    # 
-    # to = c("Plastic film remnants", "Paper (Misc)","Foam insulation & packaging","Plastic pieces (solid)", "Plastic packaging (food)", "Plastic wrap (non-food)")
-    # 
-    # for(z in 1:length(from)){
-    #   
-    #   df.Qfilt$item = plyr::mapvalues(df.Qfilt$item, from = from[z], to = to[z])
-    #   
-    # }
-```
         
 ```{r pier-items}
 P <- site_select %>%
