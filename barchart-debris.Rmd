@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "plyr", "reshape2") 
 lapply(lib.load, require, character.only = TRUE) 
 
 ```
@@ -52,9 +52,17 @@ top_items_per_site <- site_total %>% group_by(Site) %>% top_n(3, mean)
 #normalise sites
 site_total_mat <- site_select %>%
   group_by(Site, Material) %>%
-  mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
+  summarise(mean=mean(Total), #mean of item type per site
          mean_sd=sd(Total)) %>% #sd of item type per site
         ungroup()
+
+# plyr version of the same thing:
+site_total_mat <- ddply(site_select,
+                        .(Site, Material), # group by these factors
+                        summarise,
+                        mean=mean(Total),
+                        sd=sd(Total)
+                        )
 
 site_total_mat <- site_total_mat %>%
   select(Location, Habitat, Site, Material, mean, mean_sd) %>%

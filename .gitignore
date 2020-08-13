@@ -26,6 +26,7 @@ vignettes/*.pdf
 *.knit.md
 # R Environment Variables
 .Renviron
+<<<<<<< HEAD
 Data
 Output
 wordcloud_early.html
@@ -34,3 +35,6 @@ wordcloud_early_files
 wordcloud_recent.html
 wordcloud_recent_files
 .DS_Store
+=======
+.Rproj.user
+>>>>>>> 3bd22133355186f51ea3f2157f7b8d9c8bc1e621
