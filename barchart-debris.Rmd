@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "plyr", "reshape2") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats") 
 lapply(lib.load, require, character.only = TRUE) 
 
 ```
@@ -30,6 +30,26 @@ site_select <- data %>%
 item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 ```
 
+```{r survey-count}
+#create a count for number of surveys
+sampling_dates <- data %>%
+  group_by(Location) %>%
+  filter(Team=="UNSW") %>%
+  count(Date)
+
+#take away the debris count
+sampling_dates$n <- NULL
+
+sampling_dates <- sampling_dates %>%
+  count(Location) %>%
+  arrange(desc(n)) %>%
+  rename(NumberSurveys=n)
+
+#join survey to site select
+site_select <- left_join(site_select, sampling_dates, by="Location")
+```
+
+
 ```{r item-counts}
 #normalise sites
 site_total_item <- site_select %>%
@@ -45,7 +65,7 @@ site_total_item <- site_total_item %>%
   
 site_total_item <- left_join(site_total_item, item_code, by="ID")
 
-top_items_per_site <- site_total %>% group_by(Site) %>% top_n(3, mean)
+top_items_per_site <- site_total_item %>% group_by(Site) %>% top_n(3, mean)
 ``` 
 
 ```{r material-counts}
@@ -57,15 +77,15 @@ site_total_mat <- site_select %>%
         ungroup()
 
 # plyr version of the same thing:
-site_total_mat <- ddply(site_select,
-                        .(Site, Material), # group by these factors
-                        summarise,
-                        mean=mean(Total),
-                        sd=sd(Total)
-                        )
+# site_total_mat <- plyr::ddply(site_select,
+#                         .(Site, Material), # group by these factors
+#                         summarise,
+#                         mean=mean(Total),
+#                         sd=sd(Total)
+#                         )
 
 site_total_mat <- site_total_mat %>%
-  select(Location, Habitat, Site, Material, mean, mean_sd) %>%
+  # select(Location, Habitat, Site, Material, mean, mean_sd) %>%
   filter(mean > 0) %>%
   distinct()
 
@@ -94,12 +114,14 @@ total_P <- left_join(total_P, item_code, by="ID")
 total_P <- total_P %>%
   filter(mean>2)
 
-total_P %>%
+p_total_P <- total_P %>%
   mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
   ggplot( aes(x=item_name, y=mean, fill=Material)) +
   geom_col() +
   coord_flip() +
   facet_wrap(~Site)
+
+ggsave(filename = "figures/total_p.png", plot = p_total_P, dpi = 600)
 ```
 
 
@@ -119,12 +141,14 @@ total_SS <- left_join(total_SS, item_code, by="ID")
 total_SS <- total_SS %>%
   filter(mean>2)
 
-total_SS %>%
+p_total_SS  <- total_SS %>%
   mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
   ggplot( aes(x=item_name, y=mean, fill=Material)) +
   geom_col() +
   coord_flip() +
   facet_wrap(~Site)
+
+ggsave(filename = "figures/total_ss.png", plot = p_total_SS, dpi = 600)
 ```
 ```{r fishing}
 fishing <- site_select %>%
@@ -139,14 +163,51 @@ site_habitat <- select(site_select, c(Site, Habitat, Location))
 site_habitat <- distinct(site_habitat)
 fishing <- left_join(fishing, site_habitat, by="Site")
 
-fishing %>%
-  ggplot( aes(x=Fishing, y=mean, fill=Location)) +
-  geom_bar(position="dodge", stat="identity") +
-  facet_wrap(~Habitat)
-
-fishing %>%
+p_fishing <- fishing %>%
   ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
   geom_bar(position="stack", stat="identity") +
   facet_wrap(~Location)
+
+ggsave(filename = "figures/fishing.png", plot = p_fishing, dpi = 600)
+```
+```{r habitat}
+habitat <- site_select %>%
+  group_by(Location, Habitat) %>%
+  summarise(item_total=sum(Total),
+            mean=item_total/NumberSurveys,
+            mean_sd=sd(Total)) %>%
+  arrange(desc(mean))
+
+habitat <- distinct(habitat)
+
+p_habitat <- habitat %>%
+  ggplot( aes(x=Habitat, y=mean, fill=Habitat)) +
+  geom_bar(position="dodge", stat="identity") +
+  ggtitle("Mean of debris items per survey") +
+  facet_wrap(~Location)
+p_habitat
+
+ggsave(filename = "figures/habitat.png", plot = p_habitat, dpi = 600)
+```
+```{r debris-through-time}
+site_select_sum <- site_select %>%
+  group_by(Date, Location, Habitat) %>%
+  summarise(sum=sum(Total), mean=mean(Total), sd=sd(Total))
+
+    
+    top_Round <- df.sum %>%
+      group_by(Cycle) %>%
+      top_n(5, sum) 
+    
+time_line <- ggplot(site_select_sum, aes(x=Date, y=sum, group=Habitat, colour=Habitat)) +
+      geom_line() +
+      geom_point() +
+      ggtitle("Debris count per Survey") +
+      guides(colour=guide_legend("Item type")) +
+      ylab("Total item count") +
+      facet_wrap(~Location)
+    time_line
+    
+    ggsave(filename = "figures/timeline.png", plot = time_line, dpi = 600)
 ```
 
