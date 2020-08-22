@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra") 
 lapply(lib.load, require, character.only = TRUE) 
 
 ```
@@ -21,13 +21,14 @@ data$Date <- dmy(data$Date)
 data$Notes <- as.character(data$Notes)
 
 site_select <- data %>%
-  filter(Team=="UNSW" & Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT","ATHOL")) %>%
+  filter(Team=="UNSW" & Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
   select(-Habitat2, -Fragment, -Whole)
-
 ```
 
 ```{r load-item-code}
-item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") #load item names
+item_code <- item_code %>%
+  select(ID, item_name) #filter out material as some item types may have more than one material type (ex. fishing items, furniture)
 ```
 
 ```{r survey-count}
@@ -48,30 +49,51 @@ sampling_dates <- sampling_dates %>%
 #join survey to site select
 site_select <- left_join(site_select, sampling_dates, by="Location")
 ```
-
-
 ```{r item-counts}
 #normalise sites
 site_total_item <- site_select %>%
-  group_by(Site, ID) %>%
+  group_by(Site, Material, ID) %>%
   mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
          mean_sd=sd(Total)) %>% #sd of item type per site
         ungroup()
 
 site_total_item <- site_total_item %>%
-  select(Location, Habitat, Site, ID, mean, mean_sd) %>%
+  select(Location, Habitat, Site, Material, ID, mean, mean_sd) %>%
   filter(mean > 0) %>%
   distinct()
   
 site_total_item <- left_join(site_total_item, item_code, by="ID")
 
-top_items_per_site <- site_total_item %>% group_by(Site) %>% top_n(3, mean)
+top_items_per_site <- site_total_item %>% group_by(Site) %>% top_n(2, mean)
+```
+
+
+```{r top-items}
+item_total <- site_select %>%
+  group_by(Material, ID) %>%
+  mutate(sum=sum(Total), #sum of total items by type
+         sd=sd(Total)) %>% #sd of total items by type
+        select(ID, Material, sum, sd) %>% #remove irrelevant columns
+        filter(sum>0) %>% #remove null values
+        arrange(desc(sum)) %>% #show high counts first
+        distinct() %>% #remove duplicate entries
+        ungroup()
+
+item_total <- left_join(item_total, item_code, by="ID") #join item names
+
+top_items <- item_total %>% top_n(20, sum) #show top 20 items over all surveys combined
+
+rmarkdown::paged_table(top_items) %>% #print clean table
+kable("html", col.names = c("ID", "Material", "Sum", "SD", "Name"),
+      caption = "Top 20 items across all surveys") %>% 
+  kable_styling(bootstrap_options="condensed", position="left") %>%
+  scroll_box(width = "100%", height = "500px")
 ``` 
 
 ```{r material-counts}
 #normalise sites
 site_total_mat <- site_select %>%
-  group_by(Site, Material) %>%
+  group_by(Site, Material) %>%  #group by material findings at each site
   summarise(mean=mean(Total), #mean of item type per site
          mean_sd=sd(Total)) %>% #sd of item type per site
         ungroup()
@@ -84,42 +106,53 @@ site_total_mat <- site_select %>%
 #                         sd=sd(Total)
 #                         )
 
+
 site_total_mat <- site_total_mat %>%
-  # select(Location, Habitat, Site, Material, mean, mean_sd) %>%
-  filter(mean > 0) %>%
-  distinct()
+  filter(mean > 0) %>% #remove 0 values
+  distinct() #remove duplicates
 
-#not working...
-# var_change <- c("Rubber", "Timber", "Cloth", "Ceramic", "Undetermined", "E-Waste", "Paper", "Brick or Cement")
-# 
-# site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other"
+# rename material categories 
+var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber") #state variables to rename
+site_total_mat$Material <- as.character(site_total_mat$Material) #change Material to character
+site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other" #set categories to Other
 
-top_mat_per_site <- site_total_mat %>% group_by(Site) %>% top_n(2, mean)
+#top materials at each site by mean
+top_mat_per_site <- site_total_mat %>% group_by(Site) %>% top_n(1, mean)
 
+rmarkdown::paged_table(top_mat_per_site) %>% #print clean table
+kable("html", col.names = c("Site", "Material", "Mean", "SD"),
+      caption = "Top Material Type per Site") %>% 
+  kable_styling(bootstrap_options="condensed", position="left") %>%
+  scroll_box(width = "100%", height = "500px")
 ``` 
         
 ```{r pier-items}
 P <- site_select %>%
-  filter(Habitat=="P")
+  filter(Habitat=="P") #isolate pier sites
 
 total_P <- P %>%
-  group_by(Site, ID) %>%
-  summarise(item_total=sum(Total),
-            mean=item_total/NumberSurveys) %>%
-  arrange(desc(mean))
+  group_by(Site, Material, ID) %>% #looking at item types per site
+  summarise(item_total=sum(Total), #total number of each item per site
+            mean=item_total/NumberSurveys) %>% #mean of each item per site
+  arrange(desc(mean)) #listed by largest means
 
-total_P <- distinct(total_P)
-total_P <- left_join(total_P, item_code, by="ID")
+total_P <- distinct(total_P) #removing duplicate records
+total_P <- left_join(total_P, item_code, by="ID") #adding item name
 
 total_P <- total_P %>%
-  filter(mean>2)
+  filter(mean>0) #filter out null values
+
+total_P$Material <- as.character(total_P$Material) #change Material to character
+total_P$Material[total_P$Material %in% var_change] = "Other" #set categories to Other
 
 p_total_P <- total_P %>%
   mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
-  ggplot( aes(x=item_name, y=mean, fill=Material)) +
+  ggplot( aes(x=Material, y=mean, fill=Material)) +
   geom_col() +
   coord_flip() +
   facet_wrap(~Site)
+
+p_total_P
 
 ggsave(filename = "figures/total_p.png", plot = p_total_P, dpi = 600)
 ```
@@ -130,59 +163,72 @@ SS <- site_select %>%
   filter(Habitat=="SS")
 
 total_SS <- SS %>%
-  group_by(Site, ID) %>%
-  summarise(item_total=sum(Total),
-            mean=item_total/NumberSurveys) %>%
-  arrange(desc(mean))
+  group_by(Site, Material, ID) %>% #looking at item types per site
+  summarise(item_total=sum(Total), #total number of each item per site
+            mean=item_total/NumberSurveys) %>% #mean of each item per site
+  arrange(desc(mean)) #listed by largest means
 
-total_SS <- distinct(total_SS)
-total_SS <- left_join(total_SS, item_code, by="ID")
+total_SS <- distinct(total_SS) #removing duplicate records
+total_SS <- left_join(total_SS, item_code, by="ID") #adding item name
 
 total_SS <- total_SS %>%
-  filter(mean>2)
+  filter(mean>0) #filter out null values
 
-p_total_SS  <- total_SS %>%
-  mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
-  ggplot( aes(x=item_name, y=mean, fill=Material)) +
+total_SS$Material <- as.character(total_SS$Material) #change Material to character
+total_SS$Material[total_SS$Material %in% var_change] = "Other" #set categories to Other
+
+p_total_SS <- total_SS %>%
+  mutate(item_name=fct_reorder(item_name,desc(mean))) %>% 
+  ggplot( aes(x=Material, y=mean, fill=Material)) +
   geom_col() +
-  coord_flip() +
+  coord_flip() + 
   facet_wrap(~Site)
+
+p_total_SS
 
 ggsave(filename = "figures/total_ss.png", plot = p_total_SS, dpi = 600)
 ```
 ```{r fishing}
 fishing <- site_select %>%
-  group_by(Site, Fishing) %>%
-  summarise(item_total=sum(Total),
-            mean=item_total/NumberSurveys) %>%
+  group_by(Site, Fishing) %>% #group by fishing or non-fishing
+  summarise(item_total=sum(Total), #total fishing items
+            mean=item_total/NumberSurveys) %>% #total per survey
   arrange(desc(mean))
 
-fishing <- distinct(fishing)
+fishing <- distinct(fishing) #remove duplicates
 
-site_habitat <- select(site_select, c(Site, Habitat, Location))
-site_habitat <- distinct(site_habitat)
-fishing <- left_join(fishing, site_habitat, by="Site")
+site_habitat <- site_select %>%
+  select(Site, Habitat, Location) %>% #create df for labeling
+  distinct() #remove duplicates
+fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
 
 p_fishing <- fishing %>%
   ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
   geom_bar(position="stack", stat="identity") +
   facet_wrap(~Location)
 
+p_fishing
+
 ggsave(filename = "figures/fishing.png", plot = p_fishing, dpi = 600)
 ```
 ```{r habitat}
 habitat <- site_select %>%
-  group_by(Location, Habitat) %>%
-  summarise(item_total=sum(Total),
-            mean=item_total/NumberSurveys,
-            mean_sd=sd(Total)) %>%
+  group_by(Location, Habitat, Material) %>%
+  summarise(item_total=sum(Total), #total number of each material type per site
+            mean=item_total/NumberSurveys, #mean of each material type per site
+            mean_sd=sd(Total)) %>% #sd of each material type per site
   arrange(desc(mean))
 
-habitat <- distinct(habitat)
+habitat <- habitat %>%
+  filter(mean>0) %>% #filter null values
+  distinct() #remove duplicates
+
+habitat$Material <- as.character(habitat$Material) #change Material to character
+habitat$Material[habitat$Material %in% var_change] = "Other" #set categories to Other
 
 p_habitat <- habitat %>%
-  ggplot( aes(x=Habitat, y=mean, fill=Habitat)) +
-  geom_bar(position="dodge", stat="identity") +
+  ggplot( aes(x=Habitat, y=mean, fill=Material)) +
+  geom_bar(position="stack", stat="identity") +
   ggtitle("Mean of debris items per survey") +
   facet_wrap(~Location)
 p_habitat
