@@ -60,7 +60,7 @@ read.csv('data/scopus_colnames.csv', header=FALSE) %>%
 ### Loading SCOPUS dataset
 ```{r load-data, results='hide'}
 # Load bibtex files and format into bibliometrix object
-bib <- convert2df(file = "./data/md.bib", dbsource = "scopus", format = "bibtex")
+bib <- convert2df(file = c("./all_data/md_old.bib", "./all_data/md_recent.bib"), dbsource = "scopus", format = "bibtex")
 
 save(bib, file = "./data/bib.RData") #save this data frame as RData
 ```
@@ -85,7 +85,7 @@ as.Date(annual_prod$Year, format="%Y") #set year to date format
           geom_line() + #set line to show trends over time
      #declutter labels
           labs(title = "Marine Debris Research", subtitle = "articles published per year", x="Year", y="Articles") +
-          scale_x_discrete(breaks = seq(1970, 2019, by = 5)) + 
+          scale_x_discrete(breaks = seq(1980, 2020, by = 5)) + 
           theme(axis.text.x = element_text(size = 8, angle = 90),
                 axis.text.y = element_text(size = 8),
                 panel.background = element_blank(),
@@ -115,6 +115,7 @@ kable("html", col.names = c("Reference", "Total Citations", "Year Published")) %
 ### Top producing authors
 ```{r top-authors}
 topAU <- authorProdOverTime(bib, k=20, graph=F) #extracting author's annual production
+topAU_df <- topAU$dfAU #extracting authors df
 topAU_plot <- topAU$graph #extracting ggplot from list in order to modify
 topAU_plot + #clean up graph output
   labs(title = "Authors' Publications over time", x="Authors", y="Year") + #meaningful title
@@ -223,8 +224,6 @@ mp_geog <- tm_shape(MostProdCountries_World) +
           )
 mp_geog  #check map output
 
-?tm_fill
-
 tmap_save(   #save output to png file
   tm = mp_geog,
   filename = "./figures/mp_geog.png")
@@ -239,7 +238,7 @@ rm(list = ls())
 ```{r setup-affiliations-data}
 load(file = "./data/bib.RData") #load the bibliometrix object
 NetMatrix <- biblioNetwork(bib, analysis = "collaboration",  network = "universities", sep = ";") #create affiliation collaboration network
-net=networkPlot(NetMatrix,  n = 20, Title = "International Collaborations", normalize = "association", label.n=30, type = "fruchterman", cluster="optimal", size=10, size.cex=T,edgesize = 3,labelsize=1, remove.multiple=F, remove.isolates=F) #setting parameters for network plotting
+net=networkPlot(NetMatrix,  n = 20, Title = "International Collaborations", normalize = "association", type = "fruchterman", cluster="optimal", size=10, size.cex=T,edgesize = 3,labelsize=1, remove.multiple=F, remove.isolates=F) #setting parameters for network plotting
 ```
 Below I've isolated the elements of networkPlot in order to modify them.
 ```{r setup-affiliations-graph, results='hide'}
@@ -248,7 +247,7 @@ collab_communities <- print(net$cluster_obj) #community class
 collab_clusters <- print(net$cluster_res) #data frame class
 collab_edge <- as_data_frame(collab_graph, what="edges") #inspecting edges
 collab_vertex <- as_data_frame(collab_graph, what="vertices") #inspecting vertices
-#collab_graph <- delete_vertices(collab_graph, "notreported") #filter NA values
+# collab_graph <- delete_vertices(collab_graph, "notreported") #filter NA values
 save(collab_edge, file = "./data/collab_edge.RData") #save this file to use in chord diagram later
 ```
 
@@ -302,14 +301,31 @@ Initial bibliometrix network plot isn't very clear.
 ```{r setup-topics}
 load(file = "./data/bib.RData") #load the bibliometrix object
 
-NetMatrix <- biblioNetwork(bib, analysis = "co-occurrences", network = "author_keywords", sep = ";") #create keyword network
+NetMatrix <- biblioNetwork(bib, analysis = "co-occurrences", network = "keywords", sep = ";") #create keyword network
 net <- networkPlot(NetMatrix, normalize="association", n = 30, Title = "Keyword Co-occurrences", type = "fruchterman", size.cex=TRUE, size=20, remove.multiple=F, edgesize = 10, edges.min=2) #plot keyword networks
+net
+```
+### Conceptual Structure
+```{r conceptual-structure}
+conceptualStructure(bib,
+      field = "DE", 
+      method = "MCA", 
+      quali.supp = NULL, 
+      quanti.supp = NULL, 
+      minDegree = 2, 
+      clust = "auto", 
+      k.max = 5,
+      stemming = FALSE, 
+      labelsize = 10, 
+      documents = 2, 
+      graph = TRUE
+      )
 ```
 
 ### Thematic map
 ```{r thematic-map, warning=FALSE, message=FALSE, fig.height=9.5, fig.width=11, dev='png'}
 # mapping whether keywords are motor (upper right), basic (lower right), emerging/declining (lower left) or niche (upper left) 
-Map=thematicMap(bib, field = "DE", #keywords
+Map=thematicMap(bib, field = "DE", #ID = keywords, DE = author_keywords
                 n = 500, #number of terms to include in the analysis
                 minfreq = 3, #minimum frequency of a cluster
                 stemming = FALSE, size = 0.5, #size of cluster circles
@@ -321,22 +337,49 @@ Clusters <-
 ```
 ### Visualisation of all keywords
 ```{r topics-total}
-#processing keywords data
 head(bib$DE) #check data
-words_total <- bib$DE #assign data
-words_total <- unlist(strsplit(words_total, ";")) #split the records into individual keywords
-words_total <- words_total[order(words_total)] #order alphabetically
-words_total <- gsub("^\\s+|\\s+$", "", words_total) #trim white space
-word_table_total <- table(words_total) #determine frequency of words
-word_table_total <- as.data.frame(word_table_total) #transform to df
+words_total_DE <- bib$DE #assign data
+words_total_DE <- unlist(strsplit(words_total_DE, ";")) #split the records into individual keywords
+words_total_DE <- words_total_DE[order(words_total_DE)] #order alphabetically
+words_total_DE <- gsub("^\\s+|\\s+$", "", words_total_DE) #trim white space
+word_table_total_DE <- table(words_total_DE) #determine frequency of words
+word_table_total_DE <- as.data.frame(word_table_total_DE) #transform to df
+word_table_total_DE$Keyword = word_table_total_DE$words_total_DE
+word_table_total_DE <- word_table_total_DE %>%
+  select(Keyword, Freq)
+
+#rename words_total to keyword, and then merge ID and DE datasets, adding up totals for duplicate words
+
+head(bib$ID) #check data
+words_total_ID <- bib$ID #assign data
+words_total_ID <- unlist(strsplit(words_total_ID, ";")) #split the records into individual keywords
+words_total_ID <- words_total_ID[order(words_total_ID)] #order alphabetically
+words_total_ID <- gsub("^\\s+|\\s+$", "", words_total_ID) #trim white space
+word_table_total_ID <- table(words_total_ID) #determine frequency of words
+word_table_total_ID <- as.data.frame(word_table_total_ID) #transform to df
+word_table_total_ID$Keyword = word_table_total_ID$words_total_ID
+word_table_total_ID <- word_table_total_ID %>%
+  select(Keyword, Freq)
+
+word_table_total <- 
+  rbind(word_table_total_DE, word_table_total_ID) #append author words to journal words
+
+keywords <- word_table_total %>%
+  group_by(Keyword) %>% #find duplicate matches
+  mutate(Total=sum(Freq)) %>% #add duplicate occurrences
+           ungroup() %>%
+  select(-Freq) %>% #remove redundant column
+  distinct()
+
+write.csv(keywords, "output/keywords_total.csv", row.names = FALSE) #save this data frame as a csv file
 
 #rename the count to freq for the wordcloud
-colnames(word_table_total)[colnames(word_table_total) == "words_early"] <- "word" #rename for wordcloud2
-colnames(word_table_total)[colnames(word_table_total) == "Freq"] <- "freq" #rename for wordcloud2
-word_table_total <- word_table_total %>% dplyr::filter(freq>4) #remove low values
+colnames(keywords)[colnames(keywords) == "Keyword"] <- "word" #rename for wordcloud2
+colnames(keywords)[colnames(keywords) == "Total"] <- "freq" #rename for wordcloud2
+keywords <- keywords %>% dplyr::filter(freq>2) #remove low values
 
  #writing wordcloud graphic
-  wc_total <- wordcloud2(word_table_total, shape='rectangle')
+  wc_total <- wordcloud2(keywords, shape='rectangle')
   wc_total
 ```
 ### Early research (1970-1999)
