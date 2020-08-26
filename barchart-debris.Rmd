@@ -49,6 +49,8 @@ sampling_dates <- sampling_dates %>%
 #join survey to site select
 site_select <- left_join(site_select, sampling_dates, by="Location")
 ```
+
+
 ```{r item-counts}
 #normalise sites
 site_total_item <- site_select %>%
@@ -112,7 +114,7 @@ site_total_mat <- site_total_mat %>%
   distinct() #remove duplicates
 
 # rename material categories 
-var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber") #state variables to rename
+var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") #state variables to rename
 site_total_mat$Material <- as.character(site_total_mat$Material) #change Material to character
 site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other" #set categories to Other
 
@@ -133,14 +135,13 @@ P <- site_select %>%
 total_P <- P %>%
   group_by(Site, Material, ID) %>% #looking at item types per site
   summarise(item_total=sum(Total), #total number of each item per site
-            mean=item_total/NumberSurveys) %>% #mean of each item per site
+            mean=item_total/unique(NumberSurveys)) %>% #mean of each item per site
   arrange(desc(mean)) #listed by largest means
 
-total_P <- distinct(total_P) #removing duplicate records
 total_P <- left_join(total_P, item_code, by="ID") #adding item name
 
-total_P <- total_P %>%
-  filter(mean>0) #filter out null values
+# total_P <- total_P %>%
+#   filter(mean>0) #filter out zero values
 
 total_P$Material <- as.character(total_P$Material) #change Material to character
 total_P$Material[total_P$Material %in% var_change] = "Other" #set categories to Other
@@ -154,7 +155,7 @@ p_total_P <- total_P %>%
 
 p_total_P
 
-ggsave(filename = "figures/total_p.png", plot = p_total_P, dpi = 600)
+# ggsave(filename = "figures/total_p.png", plot = p_total_P, dpi = 600)
 ```
 
 
@@ -165,14 +166,13 @@ SS <- site_select %>%
 total_SS <- SS %>%
   group_by(Site, Material, ID) %>% #looking at item types per site
   summarise(item_total=sum(Total), #total number of each item per site
-            mean=item_total/NumberSurveys) %>% #mean of each item per site
+            mean=item_total/unique(NumberSurveys)) %>% #mean of each item per site
   arrange(desc(mean)) #listed by largest means
 
-total_SS <- distinct(total_SS) #removing duplicate records
 total_SS <- left_join(total_SS, item_code, by="ID") #adding item name
 
-total_SS <- total_SS %>%
-  filter(mean>0) #filter out null values
+# total_SS <- total_SS %>%
+#   filter(mean>0) #filter out zero values
 
 total_SS$Material <- as.character(total_SS$Material) #change Material to character
 total_SS$Material[total_SS$Material %in% var_change] = "Other" #set categories to Other
@@ -186,20 +186,17 @@ p_total_SS <- total_SS %>%
 
 p_total_SS
 
-ggsave(filename = "figures/total_ss.png", plot = p_total_SS, dpi = 600)
+# ggsave(filename = "figures/total_ss.png", plot = p_total_SS, dpi = 600)
 ```
 ```{r fishing}
 fishing <- site_select %>%
   group_by(Site, Fishing) %>% #group by fishing or non-fishing
   summarise(item_total=sum(Total), #total fishing items
-            mean=item_total/NumberSurveys) %>% #total per survey
+            mean=item_total/unique(NumberSurveys)) %>% #total per survey
   arrange(desc(mean))
-
-fishing <- distinct(fishing) #remove duplicates
 
 site_habitat <- site_select %>%
   select(Site, Habitat, Location) %>% #create df for labeling
-  distinct() #remove duplicates
 fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
 
 p_fishing <- fishing %>%
@@ -215,13 +212,12 @@ ggsave(filename = "figures/fishing.png", plot = p_fishing, dpi = 600)
 habitat <- site_select %>%
   group_by(Location, Habitat, Material) %>%
   summarise(item_total=sum(Total), #total number of each material type per site
-            mean=item_total/NumberSurveys, #mean of each material type per site
+            mean=item_total/unique(NumberSurveys), #mean of each material type per site
             mean_sd=sd(Total)) %>% #sd of each material type per site
   arrange(desc(mean))
 
-habitat <- habitat %>%
-  filter(mean>0) %>% #filter null values
-  distinct() #remove duplicates
+# habitat <- habitat %>%
+#   filter(mean>0) %>% #filter null values
 
 habitat$Material <- as.character(habitat$Material) #change Material to character
 habitat$Material[habitat$Material %in% var_change] = "Other" #set categories to Other
