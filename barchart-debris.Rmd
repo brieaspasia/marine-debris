@@ -196,7 +196,9 @@ fishing <- site_select %>%
   arrange(desc(mean))
 
 site_habitat <- site_select %>%
-  select(Site, Habitat, Location) %>% #create df for labeling
+  select(Site, Habitat, Location) %>%
+  distinct() #create df for labeling
+
 fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
 
 p_fishing <- fishing %>%
