@@ -140,6 +140,12 @@ total_P <- P %>%
 
 total_P <- left_join(total_P, item_code, by="ID") #adding item name
 
+P_map <- total_P %>% #create csv to use for spatial map
+  group_by(Site) %>%
+  summarise(mean_items=sum(mean))
+  
+  write.csv(P_map, "output/P_mapping.csv", row.names = FALSE) #save this data frame as a csv file
+
 # total_P <- total_P %>%
 #   filter(mean>0) #filter out zero values
 
@@ -171,6 +177,12 @@ total_SS <- SS %>%
 
 total_SS <- left_join(total_SS, item_code, by="ID") #adding item name
 
+SS_map <- total_SS %>% #create csv to use for spatial map
+  group_by(Site) %>%
+  summarise(mean_items=sum(mean))
+  
+  write.csv(SS_map, "output/SS_map.csv", row.names = FALSE) #save this data frame as a csv file
+
 # total_SS <- total_SS %>%
 #   filter(mean>0) #filter out zero values
 
@@ -201,6 +213,8 @@ site_habitat <- site_select %>%
 
 fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
 
+write.csv(fishing, "output/fishing_map.csv", row.names = FALSE) #save this data frame as a csv file
+
 p_fishing <- fishing %>%
   ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
   geom_bar(position="stack", stat="identity") +
@@ -210,19 +224,25 @@ p_fishing
 
 ggsave(filename = "figures/fishing.png", plot = p_fishing, dpi = 600)
 ```
+
+
 ```{r habitat}
-habitat <- site_select %>%
+
+habitat <- site_select 
+habitat$Material <- as.character(habitat$Material) #change Material to character
+habitat$Material[habitat$Material %in% var_change] = "Other" #set categories to Other
+
+habitat <- habitat %>%
   group_by(Location, Habitat, Material) %>%
   summarise(item_total=sum(Total), #total number of each material type per site
             mean=item_total/unique(NumberSurveys), #mean of each material type per site
             mean_sd=sd(Total)) %>% #sd of each material type per site
   arrange(desc(mean))
 
+write.csv(habitat, "output/habitat_map.csv", row.names = FALSE) #save this data frame as a csv file
+
 # habitat <- habitat %>%
 #   filter(mean>0) %>% #filter null values
-
-habitat$Material <- as.character(habitat$Material) #change Material to character
-habitat$Material[habitat$Material %in% var_change] = "Other" #set categories to Other
 
 p_habitat <- habitat %>%
   ggplot( aes(x=Habitat, y=mean, fill=Material)) +
@@ -233,15 +253,13 @@ p_habitat
 
 ggsave(filename = "figures/habitat.png", plot = p_habitat, dpi = 600)
 ```
+
+
 ```{r debris-through-time}
 site_select_sum <- site_select %>%
   group_by(Date, Location, Habitat) %>%
   summarise(sum=sum(Total), mean=mean(Total), sd=sd(Total))
 
-    
-    top_Round <- df.sum %>%
-      group_by(Cycle) %>%
-      top_n(5, sum) 
     
 time_line <- ggplot(site_select_sum, aes(x=Date, y=sum, group=Habitat, colour=Habitat)) +
       geom_line() +
