@@ -92,6 +92,7 @@ kable("html", col.names = c("ID", "Material", "Sum", "SD", "Name"),
   scroll_box(width = "100%", height = "500px")
 ``` 
 
+
 ```{r material-counts}
 #normalise sites
 site_total_mat <- site_select %>%
@@ -200,11 +201,64 @@ p_total_SS
 
 # ggsave(filename = "figures/total_ss.png", plot = p_total_SS, dpi = 600)
 ```
+```{r top-items-per-habitat}
+item_total_per_habitat <- site_select %>%
+  group_by(Habitat, ID) %>%
+  mutate(sum=sum(Total), #sum of total items by type
+         sd=sd(Total)) %>% #sd of total items by type
+        select(ID, Habitat, sum, sd) %>% #remove irrelevant columns
+        filter(sum>0) %>% #remove null values
+        arrange(desc(sum)) %>% #show high counts first
+        distinct() %>% #remove duplicate entries
+        ungroup()
+
+item_total_per_habitat <- left_join(item_total_per_habitat, item_code, by="ID") #join item names
+
+top_items_per_pier <- item_total_per_habitat %>% 
+  filter(Habitat=="P") %>%
+  top_n(10, sum) #show top 20 items over all pier counts
+
+top_items_per_ss <- item_total_per_habitat %>% 
+  filter(Habitat=="SS") %>%
+  top_n(10, sum) #show top 10 items over all ss counts
+
+top_items_per_habitat <- rbind(top_items_per_pier, top_items_per_ss)
+    
+kable(top_items_per_habitat, booktabs = TRUE) %>%
+  pack_rows(index=c("P" = 10, "SS"=10))
+
+rmarkdown::paged_table(top_items_per_habitat) %>% #print clean table
+kable("html", 
+      booktabs=TRUE,
+      col.names = c("ID", "Habitat", "Sum", "SD", "Name"),
+      caption = "Top 10 items per Habitat Type") %>% 
+      pack_rows(index=c("P" = 10, "SS"=10)) %>%
+      kable_styling(bootstrap_options="condensed", position="left") %>%
+      scroll_box(width = "100%", height = "500px")
+```
+```{r multi-dimensional-scaling}
+library(magrittr)
+library(ggpubr)
+# Cmpute MDS
+mds <- top_items_per_habitat %>%
+  dist() %>%          
+  cmdscale() %>%
+  as_tibble()
+colnames(mds) <- c("Dim.1", "Dim.2")
+# Plot MDS
+ggscatter(mds, x = "Dim.1", y = "Dim.2", 
+          label = rownames(top_items_per_habitat),
+          size = 1,
+          repel = TRUE)
+```
+
+
 ```{r fishing}
 fishing <- site_select %>%
   group_by(Site, Fishing) %>% #group by fishing or non-fishing
   summarise(item_total=sum(Total), #total fishing items
-            mean=item_total/unique(NumberSurveys)) %>% #total per survey
+            mean=item_total/unique(NumberSurveys),
+            sd=sd(Total)) %>% #total per survey
   arrange(desc(mean))
 
 site_habitat <- site_select %>%
@@ -217,8 +271,9 @@ write.csv(fishing, "output/fishing_map.csv", row.names = FALSE) #save this data 
 
 p_fishing <- fishing %>%
   ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
-  geom_bar(position="stack", stat="identity") +
-  facet_wrap(~Location)
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  facet_wrap(~Location, scales = "free_y")
 
 p_fishing
 
@@ -246,9 +301,10 @@ write.csv(habitat, "output/habitat_map.csv", row.names = FALSE) #save this data 
 
 p_habitat <- habitat %>%
   ggplot( aes(x=Habitat, y=mean, fill=Material)) +
-  geom_bar(position="stack", stat="identity") +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-mean_sd, ymax=mean+mean_sd, width=0.2), position=position_dodge(width=0.90)) +
   ggtitle("Mean of debris items per survey") +
-  facet_wrap(~Location)
+  facet_wrap(~Location, scales="free_y")
 p_habitat
 
 ggsave(filename = "figures/habitat.png", plot = p_habitat, dpi = 600)
