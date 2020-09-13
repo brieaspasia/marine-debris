@@ -328,4 +328,30 @@ time_line <- ggplot(site_select_sum, aes(x=Date, y=sum, group=Habitat, colour=Ha
     
     ggsave(filename = "figures/timeline.png", plot = time_line, dpi = 600)
 ```
+```{r scatterplot}
+  #normalise sites
+site_total_count <- site_select %>%
+  group_by(Habitat, Location) %>%
+  mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
+         mean_sd=sd(Total)/NumberSurveys, #sd of item type per site
+         sum=sum(Total),
+         sd=sd(Total)) %>% 
+        ungroup()
+
+site_total_count <- site_total_count %>%
+  select(Location, Habitat, sum, sd, mean, mean_sd) %>%
+  distinct()
+
+ggplot(site_total_count, aes(mean, sum, colour=Habitat)) +
+  geom_point()
+
+```
+```{r glm}
+library(stats)
+m1 <- glm( Total ~ Habitat, data = site_select, family = poisson)
+summary(m1)
+
+m2 <- glm( Total ~ Fishing, data = site_select, family = poisson)
+summary(m2)
+```
 
