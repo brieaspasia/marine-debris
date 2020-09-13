@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats") 
 lapply(lib.load, require, character.only = TRUE) 
 
 ```
@@ -329,6 +329,17 @@ time_line <- ggplot(site_select_sum, aes(x=Date, y=sum, group=Habitat, colour=Ha
     ggsave(filename = "figures/timeline.png", plot = time_line, dpi = 600)
 ```
 ```{r scatterplot}
+scatter <- site_select
+  scatter$Material <- as.character(scatter$Material) #change Material to character
+scatter$Material[scatter$Material %in% var_change] = "Other" #set categories to Other
+
+scatter %>%
+  filter(Total>0) %>%
+  ggplot( aes(ID, Total, colour=Material)) +
+  geom_point(position="jitter", alpha=0.5) +
+  coord_trans(y="log10") +
+  facet_wrap(~Habitat)
+
   #normalise sites
 site_total_count <- site_select %>%
   group_by(Habitat, Location) %>%
@@ -347,7 +358,6 @@ ggplot(site_total_count, aes(mean, sum, colour=Habitat)) +
 
 ```
 ```{r glm}
-library(stats)
 m1 <- glm( Total ~ Habitat, data = site_select, family = poisson)
 summary(m1)
 
