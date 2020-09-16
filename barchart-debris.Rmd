@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom") 
 lapply(lib.load, require, character.only = TRUE) 
 
 ```
@@ -358,10 +358,24 @@ ggplot(site_total_count, aes(mean, sum, colour=Habitat)) +
 
 ```
 ```{r glm}
-m1 <- glm( Total ~ Habitat, data = site_select, family = poisson)
+#Fit a model to estimate an intercept and the difference btwn P vs SS
+m1 <- glm(Total ~ Habitat, #Total predicted by Habitat
+          data = site_select, 
+          family = "poisson") #poisson because it's count data
 summary(m1)
+tidy(m1)
+coef(m1)
+confint(m1) #shouldn't be negative?
 
-m2 <- glm( Total ~ Fishing, data = site_select, family = poisson)
-summary(m2)
+plot(m1)
+
+# #Fit a model that estimates the intercept of both habitats
+# m2 <- glm(Total ~ Habitat-1, 
+#           data = site_select, 
+#           family = "poisson")
+# summary(m2)
+# tidy(m2)
+# coef(m2)
+# confint(m2)
 ```
 
