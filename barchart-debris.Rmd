@@ -3,261 +3,270 @@ title: "BarChart-Debris"
 author: "Brie Sherow"
 date: "04/08/2020"
 output: html_document
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+    df_print: paged
+  pdf_document:
+    toc: yes
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, results='hide'}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes") 
 lapply(lib.load, require, character.only = TRUE) 
-
 ```
 
-```{r load-data}
+```{r create-site-select}
+#read in processed survey data
 data <- read.csv(file="data/all_data.csv", header=T, sep=",")
-data$Date <- dmy(data$Date)
+data$Date <- dmy(data$Date) 
 data$Notes <- as.character(data$Notes)
 
+#keep only unsw surveys and sites with public piers and >2 survey rounds
 site_select <- data %>%
-  filter(Team=="UNSW" & Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
+  filter(Team=="UNSW" & 
+           Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
   select(-Habitat2, -Fragment, -Whole)
-```
 
-```{r load-item-code}
-item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") #load item names
-item_code <- item_code %>%
-  select(ID, item_name) #filter out material as some item types may have more than one material type (ex. fishing items, furniture)
-```
-
-```{r survey-count}
-#create a count for number of surveys
+#create a df for survey count per site
 sampling_dates <- data %>%
   group_by(Location) %>%
   filter(Team=="UNSW") %>%
   count(Date)
 
-#take away the debris count
+#take away n
 sampling_dates$n <- NULL
 
+#create a column for survey count per site
 sampling_dates <- sampling_dates %>%
   count(Location) %>%
   arrange(desc(n)) %>%
   rename(NumberSurveys=n)
 
-#join survey to site select
+#join survey count to site select
 site_select <- left_join(site_select, sampling_dates, by="Location")
 ```
 
+```{r load-item-code}
+#load item names
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
 
-```{r item-counts}
-#normalise sites
+#filter out material as some item types may have more than one material type 
+#(ex. fishing items, furniture)
+item_code <- item_code %>%
+  select(ID, item_name) 
+```
+
+```{r load-site-attributes}
+#load site coords and distance from harbour mouth
+site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",") 
+```
+
+
+```{r item-counts-mean}
+#find the mean count of each item type per site
 site_total_item <- site_select %>%
-  group_by(Site, Material, ID) %>%
-  mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
-         mean_sd=sd(Total)) %>% #sd of item type per site
-        ungroup()
+  group_by(Site, Material, ID) %>% #looking at item types per site
+  summarise(sum=sum(Total), #total number of each item per site
+            mean=sum/unique(NumberSurveys), #mean of each item per site
+            sd=sd(Total)) %>% #sd of total
+            arrange(desc(mean)) #listed by largest means
 
-site_total_item <- site_total_item %>%
-  select(Location, Habitat, Site, Material, ID, mean, mean_sd) %>%
-  filter(mean > 0) %>%
-  distinct()
+site_total_item <- left_join(site_total_item, item_code, by="ID") #adding item name
   
-site_total_item <- left_join(site_total_item, item_code, by="ID")
-
-top_items_per_site <- site_total_item %>% group_by(Site) %>% top_n(2, mean)
+write.csv(site_total_item, "output/total_item.csv", row.names = FALSE) #save as csv file
 ```
 
 
 ```{r top-items}
-item_total <- site_select %>%
+#Find the top item types across all surveys
+total_item <- site_select %>%
   group_by(Material, ID) %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
         select(ID, Material, sum, sd) %>% #remove irrelevant columns
-        filter(sum>0) %>% #remove null values
+        filter(sum>0) %>% #remove zero values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
         ungroup()
 
-item_total <- left_join(item_total, item_code, by="ID") #join item names
+total_item <- left_join(total_item, item_code, by="ID") #join item names
 
-top_items <- item_total %>% top_n(20, sum) #show top 20 items over all surveys combined
+top_items <- total_item %>% top_n(20, sum) #show top 20 items total
 
-rmarkdown::paged_table(top_items) %>% #print clean table
-kable("html", col.names = c("ID", "Material", "Sum", "SD", "Name"),
+top20items <- kable(top_items, "html", 
+      col.names = c("ID", "Material", "Sum", "SD", "Name"),
       caption = "Top 20 items across all surveys") %>% 
-  kable_styling(bootstrap_options="condensed", position="left") %>%
-  scroll_box(width = "100%", height = "500px")
+  kable_styling(bootstrap_options="condensed", position="left")
+top20items #print table
+  
+save_kable(top20items, "figures/top20items.png") #save table as png
 ``` 
 
 
 ```{r material-counts}
-#normalise sites
-site_total_mat <- site_select %>%
-  group_by(Site, Material) %>%  #group by material findings at each site
-  summarise(mean=mean(Total), #mean of item type per site
-         mean_sd=sd(Total)) %>% #sd of item type per site
-        ungroup()
-
-# plyr version of the same thing:
-# site_total_mat <- plyr::ddply(site_select,
-#                         .(Site, Material), # group by these factors
-#                         summarise,
-#                         mean=mean(Total),
-#                         sd=sd(Total)
-#                         )
-
-
-site_total_mat <- site_total_mat %>%
-  filter(mean > 0) %>% #remove 0 values
-  distinct() #remove duplicates
-
 # rename material categories 
-var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") #state variables to rename
-site_total_mat$Material <- as.character(site_total_mat$Material) #change Material to character
-site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other" #set categories to Other
+site_total_mat <- site_select
 
-#top materials at each site by mean
-top_mat_per_site <- site_total_mat %>% group_by(Site) %>% top_n(1, mean)
+#state variables to rename
+var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
 
-rmarkdown::paged_table(top_mat_per_site) %>% #print clean table
-kable("html", col.names = c("Site", "Material", "Mean", "SD"),
-      caption = "Top Material Type per Site") %>% 
-  kable_styling(bootstrap_options="condensed", position="left") %>%
-  scroll_box(width = "100%", height = "500px")
+#change Material to character
+site_total_mat$Material <- as.character(site_total_mat$Material) 
+
+#set lesser used categories to 'Other'
+site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other" 
+  
+#find the top distribution of material type across all sites
+total_mat <- site_total_mat %>%
+  group_by(Site, Material) %>%  #group by material findings at each site
+  summarise(sum=sum(Total), #total items per each material per site
+            mean=mean(sum)/NumberSurveys, #mean of items by material type per site
+            sd=sd(Total)) %>% 
+            distinct() %>%          
+            ungroup()
+
+#create df for labeling habitats
+site_habitat <- site_select %>%
+  select(Site, Habitat, Location) %>%
+  distinct() 
+
+#join for labeling
+total_mat <- left_join(total_mat, site_habitat, by="Site") 
+
+LocationLabs <- c(NEUTR = "Neutral Bay", CLIFT = "Clifton Gardens", PARSL = "Parsley Bay", WATSO = "Watsons Bay", DOUBL = "Double Bay")
+HabitatLabs <- c(P = "Pier", SS = "Sediment")
+
+p_total_mat <- total_mat %>%
+  ggplot( aes(x=Habitat, y=mean, fill=Material)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  theme(axis.text.x=element_text(color = "black", size=11, 
+                                 vjust=.8, angle=30, hjust=0.8)) +
+  ylab("Mean item count by material type") + 
+  scale_x_discrete(labels= HabitatLabs) +
+  ggtitle("Mean of items by material per site") +
+  facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scales = "free_y")
+
+p_total_mat
+
+ggsave(filename = "figures/total_mat.png", plot = p_total_mat, dpi = 600)
 ``` 
         
 ```{r pier-items}
-P <- site_select %>%
-  filter(Habitat=="P") #isolate pier sites
-
-total_P <- P %>%
-  group_by(Site, Material, ID) %>% #looking at item types per site
-  summarise(item_total=sum(Total), #total number of each item per site
-            mean=item_total/unique(NumberSurveys)) %>% #mean of each item per site
-  arrange(desc(mean)) #listed by largest means
-
-total_P <- left_join(total_P, item_code, by="ID") #adding item name
-
-P_map <- total_P %>% #create csv to use for spatial map
-  group_by(Site) %>%
-  summarise(mean_items=sum(mean))
-  
-  write.csv(P_map, "output/P_mapping.csv", row.names = FALSE) #save this data frame as a csv file
-
-# total_P <- total_P %>%
-#   filter(mean>0) #filter out zero values
-
-total_P$Material <- as.character(total_P$Material) #change Material to character
-total_P$Material[total_P$Material %in% var_change] = "Other" #set categories to Other
+#isolate Pier sites
+total_P <- total_mat %>%
+  filter(Habitat=="P")
 
 p_total_P <- total_P %>%
-  mutate(item_name=fct_reorder(item_name,desc(mean))) %>%
   ggplot( aes(x=Material, y=mean, fill=Material)) +
-  geom_col() +
-  coord_flip() +
-  facet_wrap(~Site)
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  theme(axis.text.x=element_text(color = "black", vjust=.8,
+                                 angle=30, hjust=0.8)) +
+  ylab("Mean item count by material type") + 
+  ggtitle("Mean of items by material at pier sites") +
+  facet_wrap(~Location, labeller=labeller(Location=LocationLabs), scales = "free_y")
 
 p_total_P
 
-# ggsave(filename = "figures/total_p.png", plot = p_total_P, dpi = 600)
+ggsave(filename = "figures/total_P.png", plot = p_total_P, dpi = 600)
 ```
 
 
 ```{r sediment-items}
-SS <- site_select %>%
+#isolate Sediment sites
+total_SS <- total_mat %>%
   filter(Habitat=="SS")
 
-total_SS <- SS %>%
-  group_by(Site, Material, ID) %>% #looking at item types per site
-  summarise(item_total=sum(Total), #total number of each item per site
-            mean=item_total/unique(NumberSurveys)) %>% #mean of each item per site
-  arrange(desc(mean)) #listed by largest means
-
-total_SS <- left_join(total_SS, item_code, by="ID") #adding item name
-
-SS_map <- total_SS %>% #create csv to use for spatial map
-  group_by(Site) %>%
-  summarise(mean_items=sum(mean))
-  
-  write.csv(SS_map, "output/SS_map.csv", row.names = FALSE) #save this data frame as a csv file
-
-# total_SS <- total_SS %>%
-#   filter(mean>0) #filter out zero values
-
-total_SS$Material <- as.character(total_SS$Material) #change Material to character
-total_SS$Material[total_SS$Material %in% var_change] = "Other" #set categories to Other
-
 p_total_SS <- total_SS %>%
-  mutate(item_name=fct_reorder(item_name,desc(mean))) %>% 
   ggplot( aes(x=Material, y=mean, fill=Material)) +
-  geom_col() +
-  coord_flip() + 
-  facet_wrap(~Site)
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  theme(axis.text.x=element_text(color = "black", vjust=.8, 
+                                 angle=30, hjust=0.8)) +
+  ylab("Mean item count by material type") + 
+  ggtitle("Mean of items by material at sediment sites") +
+  facet_wrap(~Location, 
+             labeller=labeller(Location=LocationLabs), 
+             scales = "free_y")
 
 p_total_SS
 
-# ggsave(filename = "figures/total_ss.png", plot = p_total_SS, dpi = 600)
+ggsave(filename = "figures/total_SS.png", plot = p_total_P, dpi = 600)
 ```
 ```{r top-items-per-habitat}
+#Is the top items list different by habitat than the overall top items in chunk 7?
 item_total_per_habitat <- site_select %>%
-  group_by(Habitat, ID) %>%
+  group_by(Habitat, ID) %>% #separate the items by habitat type
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
-        select(ID, Habitat, sum, sd) %>% #remove irrelevant columns
+        select(ID, Habitat, sum, sd)%>% #remove irrelevant columns
         filter(sum>0) %>% #remove null values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
         ungroup()
 
-item_total_per_habitat <- left_join(item_total_per_habitat, item_code, by="ID") #join item names
+#join item names
+item_total_per_habitat <- left_join(item_total_per_habitat, item_code, by="ID") 
 
 top_items_per_pier <- item_total_per_habitat %>% 
   filter(Habitat=="P") %>%
-  top_n(10, sum) #show top 20 items over all pier counts
+  top_n(10, sum) #show top 10 items over all piers
 
 top_items_per_ss <- item_total_per_habitat %>% 
   filter(Habitat=="SS") %>%
-  top_n(10, sum) #show top 10 items over all ss counts
+  top_n(10, sum) #show top 10 items over all sediment sites
 
+#combine the two tables
 top_items_per_habitat <- rbind(top_items_per_pier, top_items_per_ss)
-    
-kable(top_items_per_habitat, booktabs = TRUE) %>%
-  pack_rows(index=c("P" = 10, "SS"=10))
 
-rmarkdown::paged_table(top_items_per_habitat) %>% #print clean table
-kable("html", 
-      booktabs=TRUE,
+#create kable with both pier and sediment results
+top10items_perHabitat <- top_items_per_habitat %>% 
+  mutate_if(is.numeric, format, digits=2) %>% #set 2 decimal points
+  kable("html", booktabs = TRUE, #nice format
       col.names = c("ID", "Habitat", "Sum", "SD", "Name"),
       caption = "Top 10 items per Habitat Type") %>% 
-      pack_rows(index=c("P" = 10, "SS"=10)) %>%
-      kable_styling(bootstrap_options="condensed", position="left") %>%
-      scroll_box(width = "100%", height = "500px")
-```
-```{r multi-dimensional-scaling}
-library(magrittr)
-library(ggpubr)
-# Cmpute MDS
-mds <- top_items_per_habitat %>%
-  dist() %>%          
-  cmdscale() %>%
-  as_tibble()
-colnames(mds) <- c("Dim.1", "Dim.2")
-# Plot MDS
-ggscatter(mds, x = "Dim.1", y = "Dim.2", 
-          label = rownames(top_items_per_habitat),
-          size = 1,
-          repel = TRUE)
+      pack_rows(index=c("Pier" = 10, "Sediment"=10)) %>%
+      kable_styling(bootstrap_options="condensed", position="left") 
+
+top10items_perHabitat #display table
+
+#save table as png
+save_kable(top10items_perHabitat, "figures/top10items_perHabitat.png") 
+
+#Attempt to set tables side by side didn't work
+#Reference https://bookdown.org/yihui/rmarkdown-cookbook/kable.html
+# knitr::kables(
+#   list(kable(top_items_per_pier, 
+#              "html",
+#              col.names = c("ID", "Habitat", "Sum", "SD", "Name"),
+#              caption = 'Top 10 items at pier sites',
+#              booktabs = TRUE, 
+#              valign = 't',
+#              digits=2),
+#        kable(top_items_per_ss, 
+#              "html",
+#              col.names = c("ID", "Habitat", "Sum", "SD", "Name"),
+#              caption = 'Top 10 items at pier sites',
+#              booktabs = TRUE, 
+#              valign = 't',
+#              digits=2)) %>%
+#     kable_styling(bootstrap_options = "condensed"))
 ```
 
 
-```{r fishing}
+```{r fishing-by-site}
+#Isolate fishing vs non-fishing data
 fishing <- site_select %>%
   group_by(Site, Fishing) %>% #group by fishing or non-fishing
-  summarise(item_total=sum(Total), #total fishing items
-            mean=item_total/unique(NumberSurveys),
+  summarise(sum=sum(Total), #total fishing items
+            mean=sum/unique(NumberSurveys),
             sd=sd(Total)) %>% #total per survey
   arrange(desc(mean))
 
@@ -267,7 +276,7 @@ site_habitat <- site_select %>%
 
 fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
 
-write.csv(fishing, "output/fishing_map.csv", row.names = FALSE) #save this data frame as a csv file
+write.csv(fishing, "output/fishing.csv", row.names = FALSE) #save this data frame as a csv file
 
 p_fishing <- fishing %>%
   ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
@@ -281,30 +290,30 @@ ggsave(filename = "figures/fishing.png", plot = p_fishing, dpi = 600)
 ```
 
 
-```{r habitat}
-
+```{r habitat-by-site}
 habitat <- site_select 
 habitat$Material <- as.character(habitat$Material) #change Material to character
 habitat$Material[habitat$Material %in% var_change] = "Other" #set categories to Other
 
 habitat <- habitat %>%
-  group_by(Location, Habitat, Material) %>%
-  summarise(item_total=sum(Total), #total number of each material type per site
-            mean=item_total/unique(NumberSurveys), #mean of each material type per site
-            mean_sd=sd(Total)) %>% #sd of each material type per site
+  group_by(Location, Habitat) %>%
+  summarise(sum=sum(Total), #total number of each material type per site
+            mean=sum/unique(NumberSurveys), #mean of each material type per site
+            sd=sd(Total)) %>% #sd of each material type per site
   arrange(desc(mean))
 
-write.csv(habitat, "output/habitat_map.csv", row.names = FALSE) #save this data frame as a csv file
-
-# habitat <- habitat %>%
-#   filter(mean>0) %>% #filter null values
+write.csv(habitat, "output/habitat.csv", row.names = FALSE) #save this data frame as a csv file
 
 p_habitat <- habitat %>%
-  ggplot( aes(x=Habitat, y=mean, fill=Material)) +
+  ggplot( aes(x=Habitat, y=mean, fill=Habitat)) +
   geom_bar(position="dodge", stat="identity") +
-  geom_errorbar(aes(ymin=mean-mean_sd, ymax=mean+mean_sd, width=0.2), position=position_dodge(width=0.90)) +
-  ggtitle("Mean of debris items per survey") +
-  facet_wrap(~Location, scales="free_y")
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  theme(axis.text.x=element_text(color = "black", size=11, 
+                                 vjust=.8, angle=30, hjust=0.8)) +
+  scale_x_discrete(labels= HabitatLabs) +
+  ylab("Mean item count by habitat type") + 
+  ggtitle("Mean of debris items per site") +
+  facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scales="free_y")
 p_habitat
 
 ggsave(filename = "figures/habitat.png", plot = p_habitat, dpi = 600)
@@ -312,70 +321,130 @@ ggsave(filename = "figures/habitat.png", plot = p_habitat, dpi = 600)
 
 
 ```{r debris-through-time}
+#This accumulation graphic isn't really relevant without more surveys
 site_select_sum <- site_select %>%
   group_by(Date, Location, Habitat) %>%
   summarise(sum=sum(Total), mean=mean(Total), sd=sd(Total))
 
     
-time_line <- ggplot(site_select_sum, aes(x=Date, y=sum, group=Habitat, colour=Habitat)) +
+timeline <- ggplot(site_select_sum, 
+                   aes(x=Date, y=sum, group=Habitat, colour=Habitat)) +
       geom_line() +
       geom_point() +
       ggtitle("Debris count per Survey") +
       guides(colour=guide_legend("Item type")) +
       ylab("Total item count") +
-      facet_wrap(~Location)
-    time_line
+      facet_wrap(~Location, labeller = labeller(Location=LocationLabs))
+    timeline
     
-    ggsave(filename = "figures/timeline.png", plot = time_line, dpi = 600)
+    # ggsave(filename = "figures/timeline.png", plot = timeline, dpi = 600)
 ```
-```{r scatterplot}
-scatter <- site_select
-  scatter$Material <- as.character(scatter$Material) #change Material to character
-scatter$Material[scatter$Material %in% var_change] = "Other" #set categories to Other
+```{r boxplot}
+#Find totals for each survey event
+event_total_count <- site_select
+event_total_count$Material <- as.character(event_total_count$Material) #change to character
+event_total_count$Material[event_total_count$Material %in% var_change] = "Other" #set categories to Other
 
-scatter %>%
-  filter(Total>0) %>%
-  ggplot( aes(ID, Total, colour=Material)) +
-  geom_point(position="jitter", alpha=0.5) +
-  coord_trans(y="log10") +
-  facet_wrap(~Habitat)
+#Each sum value is a count per material type per survey date
+event_total_count <- event_total_count %>%
+group_by(Habitat, Location, Material, Date) %>%
+mutate(sum=sum(Total), #total count per material group per survey date
+          sd=sd(Total)) %>% #sd of material count per survey date
+         ungroup()
 
-  #normalise sites
-site_total_count <- site_select %>%
-  group_by(Habitat, Location) %>%
-  mutate(mean=sum(Total)/NumberSurveys, #mean of item type per site
-         mean_sd=sd(Total)/NumberSurveys, #sd of item type per site
-         sum=sum(Total),
-         sd=sd(Total)) %>% 
-        ungroup()
+ #simplify table
+ event_total_count <- event_total_count %>%
+   select(Location, Habitat, Material, sum, sd) %>%
+   distinct()
 
-site_total_count <- site_total_count %>%
-  select(Location, Habitat, sum, sd, mean, mean_sd) %>%
-  distinct()
+ p_boxplot <- event_total_count %>%
+ ggplot( aes(Location, sum, fill=Habitat)) +
+   geom_boxplot( aes(Location, sum),
+                 outlier.shape=1, outlier.size=3) +
+   geom_jitter(color="black", size=0.4, alpha=0.5) +
+     theme(
+       legend.position="none",
+       plot.title = element_text(size=11)) +
+     ggtitle("Debris counts by material per survey event") +
+     ylab("Sum of each material type per survey event") +
+     facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scale="free")
 
-ggplot(site_total_count, aes(mean, sum, colour=Habitat)) +
-  geom_point()
-
+ ggsave(filename = "figures/boxplot.png", plot = timeline, dpi = 600)
 ```
-```{r glm}
-#Fit a model to estimate an intercept and the difference btwn P vs SS
+## Instead of using MDS for looking at the similarity of different ecological communities based on their species composition, I could look at the similarity of different debris item types based on their habitat. The abundance of all debris item types within replicated samples (plots or quadrats in the field, different sites etc.) is recorded and the raw data takes the form of a matrix of species (the variables) by samples.
+```{r multi-dimensional-scaling}
+#For reference:
+#http://environmentalcomputing.net/multidimensional-scaling/ OR
+#https://www.statmethods.net/advstats/mds.html
+```
+## **Regression** analysis is meant to isolate the relationship between each independent variable (Habitat) and the dependent variable (Total debris).  The interpretation of a regression coefficient is that it represents the mean change in the dependent (response) variable for each 1 unit change in an independent (predictor) variable when you hold all of the other independent (predictor) variables constant. -- Zuur Notes
+## **Normality** at each predictor variable (X) should be checked by making a histogram of all observations at that particular X value. Count data is not normal (continuous and bell-shaped), so we use poisson regression and GLM
+## **GLM** deals with discrete rather than continuous data, and poisson deals with count data (not normal). The estimate is in log scale so must be exponentiated to be positive.  Z value is the estimate / standard error and it explains how strong the effect is.  Z value taken in consideration with degrees of freedom (# of data points) gives the P value.
+```{r glm-1}
+#add distance to harbour mouth to site_select data
+site_attr <- site_attr %>%
+  select(Site, M_to_ocean) #select only distance to harbour mouth for join
+site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
+
+#GLM with one variable
 m1 <- glm(Total ~ Habitat, #Total predicted by Habitat
           data = site_select, 
           family = "poisson") #poisson because it's count data
 summary(m1)
 tidy(m1)
-coef(m1)
-confint(m1) #shouldn't be negative?
 
+m1_coef <- coef(m1)
+confint(m1)
+exp(m1_coef) #odds ratio is <1 (0.08), so there is less chance of finding debris on soft sediment sites
 plot(m1)
-
-# #Fit a model that estimates the intercept of both habitats
-# m2 <- glm(Total ~ Habitat-1, 
-#           data = site_select, 
-#           family = "poisson")
-# summary(m2)
-# tidy(m2)
-# coef(m2)
-# confint(m2)
 ```
+## Use a sample to come up with intercept and slope estimates and confidence intervals. The confidence intervals tell us that if we repeat the experiment many times, how often are the intercept and slope are in the interval based on the confidence bands. A typical choice is 95% confidence interval.  The slope is the main thing that can tell us whether there's a relationship between the response and predictor variable. 
+## **QQ Plot** compares a sample with a theoretical sample that comes from a certain distribution ex. the normal distribution.
+## **Cook's Distance** is used to identify influential data points or outliers - a way to identify points that negatively effect the regression model. The measurement is a combination of each observation’s leverage and residual values; the higher the leverage and residuals, the higher the Cook’s distance. In this case there are no observations with a Cook distance larger than 1, which is the threshold that one should take further action. 
+## **Residuals** are the difference between the actual observed response values and the response values that the model predicted. -- Zuur notes
+```{r glm-2}
+#GLM with two variables
+m2 <- glm(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat and distance
+          data = site_select, 
+          family = "poisson") #poisson because it's count data
+summary(m2)
+tidy(m2)
+
+m2_coef <- coef(m2)
+confint(m2)
+exp(m2_coef)
+plot(m2)
+```
+
+```{r testing-normality}
+
+```
+
+## **Multicollinearity** is a problem when the order of correlated predictor values change the estimates for the regression coefficients. In this data there is a danger that distance to sea is correlated to whether the debris is fishing related (as more fishing tends to occur nearer the harbour mouth) and the habitat (as lightweight soft sediment debris is likely to be carried out to sea the closer to the harbour mouth)
+```{r testing-multicollinearity}
+# as.numeric(site_select$Fishing)
+# cor.test(site_select$Fishing, site_select$M_to_ocean)
+# #Estimate 0.003335625, p-value 0.8505
+# 
+# as.numeric(site_select$Habitat)
+# cor.test(site_select$Habitat, site_select$M_to_ocean)
+# #Estimate -0.005803366, p-value 0.742
+
+```
+
+
+```{r multicollinearity-plot}
+# ggplot(data = site_select_sum, aes(x = sum, y = Habitat)) + 
+# 	geom_jitter(width = 0, height = 0.05) +
+# 	ylab("Probability of finding debris") +
+# 	xlab("Pier vs Soft Sediment") +
+#   geom_smooth()
+```
+## Multivariate analysis - each survey as a collection of debris is included as one point.  Treat debris items as a community - reduces everything into one datapoint at a survey.
+```{r multivariate analysis}
+#For reference:
+#https://cran.r-project.org/web/packages/vegan/vignettes/intro-vegan.pdf
+```
+
+
 
