@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car") 
 lapply(lib.load, require, character.only = TRUE) 
 ```
 
@@ -99,8 +99,13 @@ total_item <- left_join(total_item, item_code, by="ID") #join item names
 
 top_items <- total_item %>% top_n(20, sum) #show top 20 items total
 
-top20items <- kable(top_items, "html", 
-      col.names = c("ID", "Material", "Sum", "SD", "Name"),
+top_items <- top_items %>%
+           mutate(pct=sum/sum(sum)*100)
+
+top20items <- top_items %>%
+  mutate_if(is.numeric, format, digits=2) %>%
+  kable("html", 
+      col.names = c("ID", "Material", "Sum", "SD", "Name", "Percent"),
       caption = "Top 20 items across all surveys") %>% 
   kable_styling(bootstrap_options="condensed", position="left")
 top20items #print table
@@ -378,7 +383,23 @@ mutate(sum=sum(Total), #total count per material group per survey date
 #https://www.statmethods.net/advstats/mds.html
 ```
 ## **Regression** analysis is meant to isolate the relationship between each independent variable (Habitat) and the dependent variable (Total debris).  The interpretation of a regression coefficient is that it represents the mean change in the dependent (response) variable for each 1 unit change in an independent (predictor) variable when you hold all of the other independent (predictor) variables constant. -- Zuur Notes
-## **Normality** at each predictor variable (X) should be checked by making a histogram of all observations at that particular X value. Count data is not normal (continuous and bell-shaped), so we use poisson regression and GLM
+## **Normality** at each predictor variable (X) should be checked by making a histogram of all observations at that particular X value. Count data is not normal (continuous and bell-shaped), so we use poisson regression and GLM.
+```{r testing-normality}
+hist <- site_select %>%
+  group_by(Date, Location, Habitat) %>%
+  summarise(sum=sum(Total))
+hist
+
+#To calculate number of bins, take SQRT of the total number of data entries SQRT 36=6
+#To calculate binwidth, take the upper-lower entry / BINS.  602-0 / 6 = 100.
+
+ggplot(hist, aes(sum)) +
+  geom_histogram(bins=6, binwidth=100, alpha=0.5, position="identity")
+
+ggplot(hist, aes(sum)) +
+  geom_histogram(bins=6, binwidth=100, alpha=0.5, position="identity") +
+  facet_grid(~Habitat)
+```
 ## **GLM** deals with discrete rather than continuous data, and poisson deals with count data (not normal). The estimate is in log scale so must be exponentiated to be positive.  Z value is the estimate / standard error and it explains how strong the effect is.  Z value taken in consideration with degrees of freedom (# of data points) gives the P value.
 ```{r glm-1}
 #add distance to harbour mouth to site_select data
@@ -397,6 +418,16 @@ m1_coef <- coef(m1)
 confint(m1)
 exp(m1_coef) #odds ratio is <1 (0.08), so there is less chance of finding debris on soft sediment sites
 plot(m1)
+
+#Residuals vs Fitted checks for homogeneity of the variance and the linear relation. (There should be no pattern for assumptions to be met, but there is a pattern.)
+#QQ checks for the normal distribution of the residuals, and points should fall on a line. (It's not a line).
+#Scale Location is the same as Residuals vs Fitted but with the residuals sqrt standardised.
+#Cooks Distance detects points that have an overly large impact on the regression coefficients.
+#Reference: https://biologyforfun.wordpress.com/2014/04/16/checking-glm-model-assumptions-in-r/
+
+#plot Cook's Distance - why is this different than plot(m1)? 
+CD_m1 <- cooks.distance(m1)
+plot(CD_m1)
 ```
 ## Use a sample to come up with intercept and slope estimates and confidence intervals. The confidence intervals tell us that if we repeat the experiment many times, how often are the intercept and slope are in the interval based on the confidence bands. A typical choice is 95% confidence interval.  The slope is the main thing that can tell us whether there's a relationship between the response and predictor variable. 
 ## **QQ Plot** compares a sample with a theoretical sample that comes from a certain distribution ex. the normal distribution.
@@ -415,11 +446,6 @@ confint(m2)
 exp(m2_coef)
 plot(m2)
 ```
-
-```{r testing-normality}
-
-```
-
 ## **Multicollinearity** is a problem when the order of correlated predictor values change the estimates for the regression coefficients. In this data there is a danger that distance to sea is correlated to whether the debris is fishing related (as more fishing tends to occur nearer the harbour mouth) and the habitat (as lightweight soft sediment debris is likely to be carried out to sea the closer to the harbour mouth)
 ```{r testing-multicollinearity}
 # as.numeric(site_select$Fishing)
@@ -447,4 +473,43 @@ plot(m2)
 ```
 
 
+```{r glm-lightweight-debris-distance}
+top_lgtwgt <- site_select %>%
+  filter(ID %in% c("BP3", "S2", "S6", "H10", "S7"))
+  top_lgtwgt
 
+#GLM with one variable
+m_lgtwgt <- glm(Total ~ M_to_ocean, #Total predicted by Habitat
+          data = top_lgtwgt, 
+          family = "poisson") #poisson because it's count data
+summary(m_lgtwgt)
+tidy(m_lgtwgt)
+
+plot(m_lgtwgt)
+```
+```{r glm-pier-distance}
+pier_select <- site_select %>%
+  filter(Habitat=="P")
+
+#GLM with one variable
+m_pier <- glm(Total ~ M_to_ocean, #Total predicted by Habitat
+          data = pier_select, 
+          family = "poisson") #poisson because it's count data
+summary(m_pier)
+tidy(m_pier)
+
+plot(m_pier)
+```
+```{r glm-sediment-distance}
+ss_select <- site_select %>%
+  filter(Habitat=="SS")
+
+#GLM with one variable
+m_ss <- glm(Total ~ M_to_ocean, #Total predicted by Habitat
+          data = ss_select, 
+          family = "poisson") #poisson because it's count data
+summary(m_ss)
+tidy(m_ss)
+
+plot(m_ss)
+```
