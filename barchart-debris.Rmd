@@ -444,6 +444,8 @@ m2_coef <- coef(m2)
 confint(m2)
 exp(m2_coef)
 plot(m2)
+
+#Range of dots on the residuals vs fitted is overdispersion, it's not accounting for the mean variance relationship correctly.  One of our assumptions is that variance is constant.  To fix this, use negative binomial instead of poisson.  Use MASS package, google negative binomial glm.
 ```
 ## **Multicollinearity** is a problem when the order of correlated predictor values change the estimates for the regression coefficients. In this data there is a danger that distance to sea is correlated to whether the debris is fishing related (as more fishing tends to occur nearer the harbour mouth) and the habitat (as lightweight soft sediment debris is likely to be carried out to sea the closer to the harbour mouth)
 ```{r testing-multicollinearity}
