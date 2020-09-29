@@ -131,9 +131,8 @@ site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other"
 total_mat <- site_total_mat %>%
   group_by(Site, Material) %>%  #group by material findings at each site
   summarise(sum=sum(Total), #total items per each material per site
-            mean=mean(sum)/NumberSurveys, #mean of items by material type per site
+            mean=mean(sum)/unique(NumberSurveys), #mean of items by material type per site
             sd=sd(Total)) %>% 
-            distinct() %>%          
             ungroup()
 
 #create df for labeling habitats
