@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car") 
+lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car", "MASS") 
 lapply(lib.load, require, character.only = TRUE) 
 ```
 
@@ -406,12 +406,23 @@ site_attr <- site_attr %>%
   select(Site, M_to_ocean) #select only distance to harbour mouth for join
 site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
 
-#GLM with one variable
-m1 <- glm(Total ~ Habitat, #Total predicted by Habitat
-          data = site_select, 
-          family = "poisson") #poisson because it's count data
+# #GLM poisson with one variable
+# m1 <- glm(Total ~ Habitat, #Total predicted by Habitat
+#           data = site_select, 
+#           family = "poisson") #poisson because it's count data
+# summary(m1)
+# tidy(m1)
+# 
+# m1_coef <- coef(m1)
+# confint(m1)
+# exp(m1_coef) #odds ratio is <1 (0.08), so there is less chance of finding debris on soft sediment sites
+# plot(m1)
+
+#GLM negative binomial with one variable
+m1 <- glm.nb(Total ~ Habitat, #Total predicted by Habitat
+          data = site_select)
 summary(m1)
-tidy(m1)
+plot(m1)
 
 m1_coef <- coef(m1)
 confint(m1)
@@ -433,10 +444,21 @@ plot(CD_m1)
 ## **Cook's Distance** is used to identify influential data points or outliers - a way to identify points that negatively effect the regression model. The measurement is a combination of each observation’s leverage and residual values; the higher the leverage and residuals, the higher the Cook’s distance. In this case there are no observations with a Cook distance larger than 1, which is the threshold that one should take further action. 
 ## **Residuals** are the difference between the actual observed response values and the response values that the model predicted. -- Zuur notes
 ```{r glm-2}
-#GLM with two variables
-m2 <- glm(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat and distance
-          data = site_select, 
-          family = "poisson") #poisson because it's count data
+# #GLM with two variables
+# m2 <- glm(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat and distance
+#           data = site_select, 
+#           family = "poisson") #poisson because it's count data
+# summary(m2)
+# tidy(m2)
+# 
+# m2_coef <- coef(m2)
+# confint(m2)
+# exp(m2_coef)
+# plot(m2)
+
+#GLM negative binomial with two variables
+m2 <- glm.nb(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat and distance
+          data = site_select)
 summary(m2)
 tidy(m2)
 
