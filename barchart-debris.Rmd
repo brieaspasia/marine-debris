@@ -31,7 +31,7 @@ data$Notes <- as.character(data$Notes)
 site_select <- data %>%
   filter(Team=="UNSW" & 
            Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
-  select(-Habitat2, -Fragment, -Whole)
+  dplyr::select(-Habitat2, -Fragment, -Whole)
 
 #create a df for survey count per site
 sampling_dates <- data %>%
@@ -59,7 +59,7 @@ item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
 item_code <- item_code %>%
-  select(ID, item_name) 
+  dplyr::select(ID, item_name) 
 ```
 
 ```{r load-site-attributes}
@@ -89,7 +89,7 @@ total_item <- site_select %>%
   group_by(Material, ID) %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
-        select(ID, Material, sum, sd) %>% #remove irrelevant columns
+        dplyr::select(ID, Material, sum, sd) %>% #remove irrelevant columns
         filter(sum>0) %>% #remove zero values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
@@ -137,7 +137,7 @@ total_mat <- site_total_mat %>%
 
 #create df for labeling habitats
 site_habitat <- site_select %>%
-  select(Site, Habitat, Location) %>%
+  dplyr::select(Site, Habitat, Location) %>%
   distinct() 
 
 #join for labeling
@@ -210,7 +210,7 @@ item_total_per_habitat <- site_select %>%
   group_by(Habitat, ID) %>% #separate the items by habitat type
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
-        select(ID, Habitat, sum, sd)%>% #remove irrelevant columns
+        dplyr::select(ID, Habitat, sum, sd)%>% #remove irrelevant columns
         filter(sum>0) %>% #remove null values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
@@ -275,7 +275,7 @@ fishing <- site_select %>%
   arrange(desc(mean))
 
 site_habitat <- site_select %>%
-  select(Site, Habitat, Location) %>%
+  dplyr::select(Site, Habitat, Location) %>%
   distinct() #create df for labeling
 
 fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
@@ -358,7 +358,7 @@ mutate(sum=sum(Total), #total count per material group per survey date
 
  #simplify table
  event_total_count <- event_total_count %>%
-   select(Location, Habitat, Material, sum, sd) %>%
+   dplyr::select(Location, Habitat, Material, sum, sd) %>%
    distinct()
 
  p_boxplot <- event_total_count %>%
@@ -403,7 +403,7 @@ ggplot(hist, aes(sum)) +
 ```{r glm-1}
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  select(Site, M_to_ocean) #select only distance to harbour mouth for join
+  dplyr::select(Site, M_to_ocean) #select only distance to harbour mouth for join
 site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
 
 # #GLM poisson with one variable
@@ -501,36 +501,33 @@ top_lgtwgt <- site_select %>%
   filter(ID %in% c("BP3", "S2", "S6", "H10", "S7"))
   top_lgtwgt
 
-#GLM with one variable
-m_lgtwgt <- glm(Total ~ M_to_ocean, #Total predicted by Habitat
-          data = top_lgtwgt, 
-          family = "poisson") #poisson because it's count data
+#negative binomial GLM with two variables
+m_lgtwgt <- glm.nb(Total ~ Habitat + M_to_ocean, #Total predicted by habitat and distance
+          data = top_lgtwgt)
 summary(m_lgtwgt)
 tidy(m_lgtwgt)
 
 plot(m_lgtwgt)
 ```
-```{r glm-pier-distance}
-pier_select <- site_select %>%
-  filter(Habitat=="P")
+```{r glm-fishing-distance}
+fishing_select <- site_select %>%
+  filter(Fishing=="Fishing")
 
-#GLM with one variable
-m_pier <- glm(Total ~ M_to_ocean, #Total predicted by Habitat
-          data = pier_select, 
-          family = "poisson") #poisson because it's count data
-summary(m_pier)
-tidy(m_pier)
+#negative binomial GLM with one variable
+m_fishing <- glm.nb(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat
+          data = fishing_select)
+summary(m_fishing)
+tidy(m_fishing)
 
-plot(m_pier)
+plot(m_fishing)
 ```
 ```{r glm-sediment-distance}
 ss_select <- site_select %>%
   filter(Habitat=="SS")
 
 #GLM with one variable
-m_ss <- glm(Total ~ M_to_ocean, #Total predicted by Habitat
-          data = ss_select, 
-          family = "poisson") #poisson because it's count data
+m_ss <- glm.nb(Total ~ M_to_ocean, #Total predicted by distance
+          data = ss_select)
 summary(m_ss)
 tidy(m_ss)
 
