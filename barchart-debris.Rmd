@@ -429,6 +429,28 @@ confint(m1)
 exp(m1_coef) #odds ratio is <1 (0.08), so there is less chance of finding debris on soft sediment sites
 plot(m1)
 
+```
+
+Another way to look at residuals - this is what you'll use for GLMM so better to use this method:
+
+```{r}
+library(DHARMa)
+simulationOutput <- simulateResiduals(fittedModel = m1)
+plot(simulationOutput)
+```
+
+You can also do all these other tests using the object 'simulationOutput':
+
+testUniformity() - tests if the overall distribution conforms to expectations
+testOutliers() - tests if there are more simulation outliers than expected
+testDispersion() - tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles() - fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroinflation() - tests if there are more zeros than expected
+testGeneric() - test if a generic summary statistics deviates from model expectations
+testTemporalAutocorrelation() - tests for temporal autocorrelation in the residuals
+testSpatialAutocorrelation() - tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
+
+```{r}
 #Residuals vs Fitted checks for homogeneity of the variance and the linear relation. (There should be no pattern for assumptions to be met, but there is a pattern.)
 #QQ checks for the normal distribution of the residuals, and points should fall on a line. (It's not a line).
 #Scale Location is the same as Residuals vs Fitted but with the residuals sqrt standardised.
