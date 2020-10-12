@@ -16,7 +16,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r load-libraries, echo=FALSE, include=FALSE}
+```{r load-libraries, echo=FALSE}
 lib.load = c("ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car", "MASS", "DHARMa") 
 lapply(lib.load, require, character.only = TRUE) 
 
@@ -115,6 +115,8 @@ top20items <- top_items %>%
 top20items #print table
   
 save_kable(top20items, "figures/top20items.png") #save table as png
+
+install.packages("magick")
 ``` 
 
 
@@ -438,24 +440,23 @@ plot(m1)
 
 Another way to look at residuals - this is what you'll use for GLMM so better to use this method:
 
-```{r}
-library(DHARMa)
-simulationOutput <- simulateResiduals(fittedModel = m1)
-plot(simulationOutput)
+```{r simulation-output}
+simulationOutput <- simulateResiduals(fittedModel = m2, plot=T)
+
+testUniformity(simulationOutput) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(simulationOutput) #tests if there are more zeros than expected
+
+##Don't know why there's an error with testGeneric??
+testGeneric(simulationOutput) #test if a generic summary statistics deviates from model expectations
+
+testTemporalAutocorrelation(simulationOutput) #tests for temporal autocorrelation in the residuals
+testSpatialAutocorrelation(simulationOutput) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
 ```
 
-You can also do all these other tests using the object 'simulationOutput':
-
-testUniformity() - tests if the overall distribution conforms to expectations
-testOutliers() - tests if there are more simulation outliers than expected
-testDispersion() - tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles() - fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroinflation() - tests if there are more zeros than expected
-testGeneric() - test if a generic summary statistics deviates from model expectations
-testTemporalAutocorrelation() - tests for temporal autocorrelation in the residuals
-testSpatialAutocorrelation() - tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
-
-```{r}
+```{r cooks-distance}
 #Residuals vs Fitted checks for homogeneity of the variance and the linear relation. (There should be no pattern for assumptions to be met, but there is a pattern.)
 #QQ checks for the normal distribution of the residuals, and points should fall on a line. (It's not a line).
 #Scale Location is the same as Residuals vs Fitted but with the residuals sqrt standardised.
