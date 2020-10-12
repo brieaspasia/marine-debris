@@ -17,13 +17,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load-libraries, echo=FALSE, include=FALSE}
-lib.load = c("here", "ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car", "MASS") 
+lib.load = c("ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car", "MASS", "DHARMa") 
 lapply(lib.load, require, character.only = TRUE) 
+
 ```
 
 ```{r create-site-select}
 #read in processed survey data
-data <- read.csv(file="data/all_data.csv", header=T, sep=",")
+data <- read.csv(file="data/all_data.csv", 
+                 header=T, sep=",", 
+                 fileEncoding="UTF-8-BOM") #removes special characters
+
 data$Date <- dmy(data$Date) 
 data$Notes <- as.character(data$Notes)
 
@@ -64,7 +68,7 @@ item_code <- item_code %>%
 
 ```{r load-site-attributes}
 #load site coords and distance from harbour mouth
-site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",") 
+site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM") 
 ```
 
 
@@ -372,6 +376,7 @@ mutate(sum=sum(Total), #total count per material group per survey date
      ggtitle("Debris counts by material per survey event") +
      ylab("Sum of each material type per survey event") +
      facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scale="free")
+ p_boxplot
 
  ggsave(filename = "figures/boxplot.png", plot = timeline, dpi = 600)
 ```
