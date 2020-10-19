@@ -494,9 +494,9 @@ testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to
 testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
 
-#need to set a function for the summary in order to test particular scenarios - why does it look the same as dispesion test?
-means <- function(x) mean(x) # testing if mean prediction fits
-testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
+# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
+# means <- function(x) mean(x) # testing if mean prediction fits
+# testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
 
 testTemporalAutocorrelation(simulationOutput2) #tests for temporal autocorrelation in the residuals
 testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
@@ -538,9 +538,41 @@ plot(CD_m2)
 #   geom_smooth()
 ```
 ## Multivariate analysis - each survey as a collection of debris is included as one point.  Treat debris items as a community - reduces everything into one datapoint at a survey.
-```{r multivariate analysis}
+```{r multivariate-analysis}
 #For reference:
+#http://environmentalcomputing.net/introduction-to-mvabund/
 #https://cran.r-project.org/web/packages/vegan/vignettes/intro-vegan.pdf
+
+#Find totals for each survey event
+event_total <- site_select
+event_total$Material <- as.character(event_total$Material) #change to character
+event_total$Material[event_total_count$Material %in% var_change] = "Other" #set categories to Other
+
+#find totals per material type for each habitat and survey event
+event_total <- event_total %>%
+group_by(Location, Habitat, Material, Date) %>%
+mutate(sum=sum(Total)) #total count per material group per survey date
+
+#convert to wide table
+ event_total <- event_total %>%
+   dplyr::select(Date, Location, Habitat, Material, sum) %>%
+   distinct()
+ 
+ library(tidyr)
+ 
+ data_wide <- spread(event_total_count, Material, sum)
+
+library(mvabund)
+
+#create mvabund object
+mat_wide <- mvabund(data_wide[,4:7])
+
+#look at the spread of the data
+par(mar=c(2,10,2,2)) # adjusts the margins
+boxplot(data_wide[,4:7],horizontal = TRUE,las=2, main="Abundance")
+
+
+
 ```
 
 
