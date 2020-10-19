@@ -410,7 +410,7 @@ ggplot(hist, aes(sum)) +
 ```{r glm-1}
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  dplyr::select(Site, M_to_ocean) #select only distance to harbour mouth for join
+  dplyr::select(Site, CostDis) #select only distance to harbour mouth for join
 site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
 
 # #GLM poisson with one variable
@@ -438,10 +438,10 @@ plot(m1)
 
 ```
 
-Another way to look at residuals - this is what you'll use for GLMM so better to use this method:
+##Another way to look at residuals - this is what you'll use for GLMM so better to use this method:
 
-```{r simulation-output}
-simulationOutput <- simulateResiduals(fittedModel = m2, plot=T)
+```{r simulation-output-m1}
+simulationOutput <- simulateResiduals(fittedModel = m1, plot=T)
 
 testUniformity(simulationOutput) #tests if the overall distribution conforms to expectations
 testOutliers(simulationOutput) #tests if there are more simulation outliers than expected
@@ -450,30 +450,18 @@ testQuantiles(simulationOutput) #fits a quantile regression or residuals against
 testZeroInflation(simulationOutput) #tests if there are more zeros than expected
 
 ##Don't know why there's an error with testGeneric??
-testGeneric(simulationOutput) #test if a generic summary statistics deviates from model expectations
+#testGeneric(simulationOutput) #test if a generic summary statistics deviates from model expectations
 
 testTemporalAutocorrelation(simulationOutput) #tests for temporal autocorrelation in the residuals
 testSpatialAutocorrelation(simulationOutput) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
 ```
 
-```{r cooks-distance}
-#Residuals vs Fitted checks for homogeneity of the variance and the linear relation. (There should be no pattern for assumptions to be met, but there is a pattern.)
-#QQ checks for the normal distribution of the residuals, and points should fall on a line. (It's not a line).
-#Scale Location is the same as Residuals vs Fitted but with the residuals sqrt standardised.
-#Cooks Distance detects points that have an overly large impact on the regression coefficients.
-#Reference: https://biologyforfun.wordpress.com/2014/04/16/checking-glm-model-assumptions-in-r/
-
-#plot Cook's Distance - why is this different than plot(m1)? 
-CD_m1 <- cooks.distance(m1)
-plot(CD_m1)
-```
 ## Use a sample to come up with intercept and slope estimates and confidence intervals. The confidence intervals tell us that if we repeat the experiment many times, how often are the intercept and slope are in the interval based on the confidence bands. A typical choice is 95% confidence interval.  The slope is the main thing that can tell us whether there's a relationship between the response and predictor variable. 
 ## **QQ Plot** compares a sample with a theoretical sample that comes from a certain distribution ex. the normal distribution.
-## **Cook's Distance** is used to identify influential data points or outliers - a way to identify points that negatively effect the regression model. The measurement is a combination of each observation’s leverage and residual values; the higher the leverage and residuals, the higher the Cook’s distance. In this case there are no observations with a Cook distance larger than 1, which is the threshold that one should take further action. 
 ## **Residuals** are the difference between the actual observed response values and the response values that the model predicted. -- Zuur notes
 ```{r glm-2}
 # #GLM with two variables
-# m2 <- glm(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat and distance
+# m2 <- glm(Total ~ Habitat + CostDis, #Total predicted by Habitat and distance
 #           data = site_select, 
 #           family = "poisson") #poisson because it's count data
 # summary(m2)
@@ -485,7 +473,7 @@ plot(CD_m1)
 # plot(m2)
 
 #GLM negative binomial with two variables
-m2 <- glm.nb(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat and distance
+m2 <- glm.nb(Total ~ Habitat + CostDis, #Total predicted by Habitat and distance
           data = site_select)
 summary(m2)
 tidy(m2)
@@ -497,14 +485,45 @@ plot(m2)
 
 #Range of dots on the residuals vs fitted is overdispersion, it's not accounting for the mean variance relationship correctly.  One of our assumptions is that variance is constant.  To fix this, use negative binomial instead of poisson.  Use MASS package, google negative binomial glm.
 ```
+```{r simulation-output-m2}
+simulationOutput <- simulateResiduals(fittedModel = m2, plot=T)
+
+testUniformity(simulationOutput) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(simulationOutput) #tests if there are more zeros than expected
+
+##Don't know why there's an error with testGeneric??
+#testGeneric(simulationOutput) #test if a generic summary statistics deviates from model expectations
+
+testTemporalAutocorrelation(simulationOutput) #tests for temporal autocorrelation in the residuals
+testSpatialAutocorrelation(simulationOutput) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
+```
+## **Cook's Distance** is used to identify influential data points or outliers - a way to identify points that negatively effect the regression model. The measurement is a combination of each observation’s leverage and residual values; the higher the leverage and residuals, the higher the Cook’s distance. In this case there are no observations with a Cook distance larger than 1, which is the threshold that one should take further action. 
+```{r cooks-distance}
+#Residuals vs Fitted checks for homogeneity of the variance and the linear relation. (There should be no pattern for assumptions to be met, but there is a pattern.)
+#QQ checks for the normal distribution of the residuals, and points should fall on a line. (It's not a line).
+#Scale Location is the same as Residuals vs Fitted but with the residuals sqrt standardised.
+#Cooks Distance detects points that have an overly large impact on the regression coefficients.
+#Reference: https://biologyforfun.wordpress.com/2014/04/16/checking-glm-model-assumptions-in-r/
+
+#plot Cook's Distance - why is this different than plot(m1)? 
+CD_m1 <- cooks.distance(m1)
+plot(CD_m1)
+
+CD_m2 <- cooks.distance(m2)
+plot(CD_m2)
+```
+
 ## **Multicollinearity** is a problem when the order of correlated predictor values change the estimates for the regression coefficients. In this data there is a danger that distance to sea is correlated to whether the debris is fishing related (as more fishing tends to occur nearer the harbour mouth) and the habitat (as lightweight soft sediment debris is likely to be carried out to sea the closer to the harbour mouth)
 ```{r testing-multicollinearity}
 # as.numeric(site_select$Fishing)
-# cor.test(site_select$Fishing, site_select$M_to_ocean)
+# cor.test(site_select$Fishing, site_select$CostDis)
 # #Estimate 0.003335625, p-value 0.8505
 # 
 # as.numeric(site_select$Habitat)
-# cor.test(site_select$Habitat, site_select$M_to_ocean)
+# cor.test(site_select$Habitat, site_select$CostDis)
 # #Estimate -0.005803366, p-value 0.742
 
 ```
@@ -530,7 +549,7 @@ top_lgtwgt <- site_select %>%
   top_lgtwgt
 
 #negative binomial GLM with two variables
-m_lgtwgt <- glm.nb(Total ~ Habitat + M_to_ocean, #Total predicted by habitat and distance
+m_lgtwgt <- glm.nb(Total ~ Habitat + CostDis, #Total predicted by habitat and distance
           data = top_lgtwgt)
 summary(m_lgtwgt)
 tidy(m_lgtwgt)
@@ -542,7 +561,7 @@ fishing_select <- site_select %>%
   filter(Fishing=="Fishing")
 
 #negative binomial GLM with one variable
-m_fishing <- glm.nb(Total ~ Habitat + M_to_ocean, #Total predicted by Habitat
+m_fishing <- glm.nb(Total ~ Habitat + CostDis, #Total predicted by Habitat
           data = fishing_select)
 summary(m_fishing)
 tidy(m_fishing)
@@ -554,7 +573,7 @@ ss_select <- site_select %>%
   filter(Habitat=="SS")
 
 #GLM with one variable
-m_ss <- glm.nb(Total ~ M_to_ocean, #Total predicted by distance
+m_ss <- glm.nb(Total ~ CostDis, #Total predicted by distance
           data = ss_select)
 summary(m_ss)
 tidy(m_ss)
