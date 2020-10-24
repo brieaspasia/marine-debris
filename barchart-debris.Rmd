@@ -16,10 +16,24 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r load-libraries, echo=FALSE}
-lib.load = c("ggplot2", "dplyr", "lubridate", "forcats", "ggthemes", "knitr", "kableExtra", "stats", "broom", "hrbrthemes", "car", "MASS", "DHARMa") 
-lapply(lib.load, require, character.only = TRUE) 
-
+```{r load-libraries, echo=TRUE}
+library(ggplot2) #graphing
+library(ggthemes) #graphing templates
+library(hrbrthemes) #graphing templates
+library(lubridate) #date manipulation
+library(forcats) #working with factors
+library(tidyverse) #manipulating data
+library(knitr) #rmarkdown functions
+library(kableExtra) #table layouts
+library(magick) #image processing
+library(stats) #R stats functions
+library(broom) #create summaries from stats objects
+library(car) #lm regression
+library(MASS) #stats
+library(lme4) #glmer function
+library(DHARMa) #testing model diagnostics
+library(glmmTMB) #fit zero-inflated negative binomial
+library(mvabund) #for multivariate stats
 ```
 
 ```{r create-site-select}
@@ -115,8 +129,6 @@ top20items <- top_items %>%
 top20items #print table
   
 save_kable(top20items, "figures/top20items.png") #save table as png
-
-install.packages("magick")
 ``` 
 
 
@@ -426,8 +438,11 @@ site_select <- left_join(site_select, site_attr, by="Site") #join distance to mo
 # plot(m1)
 
 #GLM negative binomial with one variable
-m1 <- glm.nb(Total ~ Habitat, #Total predicted by Habitat
-          data = site_select)
+m1 <- glmer.nb(Total ~ Habitat + (1 | Location),#total by habitat, location random factor
+               family="poisson", #poisson b/c count data
+               data=site_select)
+
+            
 summary(m1)
 plot(m1)
 
@@ -435,6 +450,7 @@ m1_coef <- coef(m1)
 confint(m1)
 exp(m1_coef) #odds ratio is <1 (0.08), so there is less chance of finding debris on soft sediment sites
 plot(m1)
+
 
 ```
 
@@ -473,10 +489,13 @@ testSpatialAutocorrelation(simulationOutput1) #tests for spatial autocorrelation
 # plot(m2)
 
 #GLM negative binomial with two variables
-m2 <- glm.nb(Total ~ Habitat + CostDis, #Total predicted by Habitat and distance
-          data = site_select)
+m2  <- glmmTMB(Total ~ Habitat + CostDis + (1|Location), 
+               family=nbinom1(), 
+               zi = ~1, 
+               data = site_select)
 summary(m2)
 tidy(m2)
+
 
 m2_coef <- coef(m2)
 confint(m2)
@@ -558,11 +577,7 @@ mutate(sum=sum(Total)) #total count per material group per survey date
    dplyr::select(Date, Location, Habitat, Material, sum) %>%
    distinct()
  
- library(tidyr)
- 
  data_wide <- spread(event_total_count, Material, sum)
-
-library(mvabund)
 
 #create mvabund object
 mat_wide <- mvabund(data_wide[,4:7])
