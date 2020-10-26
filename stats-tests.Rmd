@@ -25,6 +25,9 @@ library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
+
+#Tutorial
+#https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
 ```
 
 ```{r create-site-select}
