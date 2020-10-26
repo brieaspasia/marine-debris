@@ -1,0 +1,86 @@
+---
+title: "stats-tests"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libraries, echo=TRUE}
+library(ggplot2) #graphing
+library(ggthemes) #graphing templates
+library(hrbrthemes) #graphing templates
+library(lubridate) #date manipulation
+library(forcats) #working with factors
+library(tidyverse) #manipulating data
+library(knitr) #rmarkdown functions
+library(kableExtra) #table layouts
+library(magick) #image processing
+library(stats) #R stats functions
+library(broom) #create summaries from stats objects
+library(car) #lm regression
+library(MASS) #stats
+library(lme4) #glmer function
+library(DHARMa) #testing model diagnostics
+library(glmmTMB) #fit zero-inflated negative binomial
+library(mvabund) #for multivariate stats
+```
+
+```{r create-site-select}
+#read in processed survey data
+data <- read.csv(file="data/all_data.csv", 
+                 header=T, sep=",", 
+                 fileEncoding="UTF-8-BOM") #removes special characters
+
+data$Date <- dmy(data$Date) 
+data$Notes <- as.character(data$Notes)
+
+#keep only unsw surveys and sites with public piers and >2 survey rounds
+site_select <- data %>%
+  filter(Team=="UNSW" & 
+           Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
+  dplyr::select(-Habitat2, -Fragment, -Whole)
+
+#create a df for survey count per site
+sampling_dates <- data %>%
+  group_by(Location) %>%
+  filter(Team=="UNSW") %>%
+  count(Date)
+
+#take away n
+sampling_dates$n <- NULL
+
+#create a column for survey count per site
+sampling_dates <- sampling_dates %>%
+  count(Location) %>%
+  arrange(desc(n)) %>%
+  rename(NumberSurveys=n)
+
+#join survey count to site select
+site_select <- left_join(site_select, sampling_dates, by="Location")
+```
+
+```{r load-item-code}
+#load item names
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+
+#filter out material as some item types may have more than one material type 
+#(ex. fishing items, furniture)
+item_code <- item_code %>%
+  dplyr::select(ID, item_name) 
+```
+
+```{r load-site-attributes}
+#load site coords and distance from harbour mouth
+site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
+
+#add distance to harbour mouth to site_select data
+site_attr <- site_attr %>%
+  dplyr::select(Site, CostDis) #select only distance to harbour mouth for join
+site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
+```
+```{r load-site}
+
+```
+
