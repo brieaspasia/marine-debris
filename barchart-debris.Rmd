@@ -29,8 +29,8 @@ library(magick) #image processing
 library(stats) #R stats functions
 library(broom) #create summaries from stats objects
 library(car) #lm regression
-library(MASS) #stats
-library(lme4) #glmer function
+library(MASS) #glmm stats (.nb)
+library(lme4) #glmm (glmer)
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
