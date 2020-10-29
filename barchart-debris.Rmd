@@ -476,36 +476,32 @@ testSpatialAutocorrelation(simulationOutput1) #tests for spatial autocorrelation
 ## **QQ Plot** compares a sample with a theoretical sample that comes from a certain distribution ex. the normal distribution.
 ## **Residuals** are the difference between the actual observed response values and the response values that the model predicted. -- Zuur notes
 ```{r glm-2}
-# #GLM with two variables
-# m2 <- glm(Total ~ Habitat + CostDis, #Total predicted by Habitat and distance
-#           data = site_select, 
-#           family = "poisson") #poisson because it's count data
-# summary(m2)
-# tidy(m2)
-# 
-# m2_coef <- coef(m2)
-# confint(m2)
-# exp(m2_coef)
-# plot(m2)
 
-#GLM negative binomial with two variables
-m2  <- glmmTMB(Total ~ Habitat + CostDis + (1|Location), 
-               family=nbinom1(), 
-               zi = ~1, 
-               data = site_select)
+#create df to use for models
+mod <- site_select %>%
+  mutate(DistKm = CostDis/100) %>%
+  group_by(Location, Habitat, DistKm, NumberSurveys, ID, Fishing) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m2  <- glmmTMB(Total ~ #Debris count
+                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
+                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
+                 (1|Location) + #site random effect
+                 (1|ID) + #debris type random effect
+                 offset(log(NumberSurveys)), #offset by survey count
+               zi = ~1, #zero inflation
+               family=nbinom1(), #negative binomial to deal with count data with lots of zeros
+               data = mod) 
+
 summary(m2)
-tidy(m2)
 
-
-m2_coef <- coef(m2)
-confint(m2)
-exp(m2_coef)
-plot(m2)
-
-#Range of dots on the residuals vs fitted is overdispersion, it's not accounting for the mean variance relationship correctly.  One of our assumptions is that variance is constant.  To fix this, use negative binomial instead of poisson.  Use MASS package, google negative binomial glm.
+#Range of dots on the residuals vs fitted is overdispersion, it's not accounting for the mean variance relationship correctly.  One of our assumptions is that variance is constant.  To fix this, use negative binomial instead of poisson. NBin takes into consideration the dispersion parameter.
 ```
 ```{r simulation-output-m2}
 simulationOutput2 <- simulateResiduals(fittedModel = m2, plot=T)
+
+plotResiduals(simulationOutput2)
 
 testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
 testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
