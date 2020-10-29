@@ -1,91 +1,91 @@
-ID,item_name,Material,SubMaterial,Fishing
-H1,Pipe/PVC,Plastic,Hard Plastic,Non-fishing
-H2,Beverage bottle <1 L,Plastic,Hard Plastic,Non-fishing
-H3,Other bottle,Plastic,Hard Plastic,Non-fishing
-H4,Bottle cap/lid,Plastic,Hard Plastic,Non-fishing
-H5,Food container,Plastic,Hard Plastic,Non-fishing
-H6,Utensil/plate/bowl,Plastic,Hard Plastic,Non-fishing
-H7,Bucket/crate,Plastic,Hard Plastic,Non-fishing
-H8,Lighter,Plastic,Hard Plastic,Non-fishing
-H9,Lollipop stick/earbud,Plastic,Hard Plastic,Non-fishing
-H10,Unknown/other hard,Plastic,Hard Plastic,Non-fishing
-S1,Thin film carry bag,Plastic,Soft Plastic,Non-fishing
-S2,Food wrapper/label,Plastic,Soft Plastic,Non-fishing
-S3,Sheeting,Plastic,Soft Plastic,Non-fishing
-S4,Cup/lid,Plastic,Soft Plastic,Non-fishing
-S5,Straw,Plastic,Soft Plastic,Non-fishing
-S6,Unknown/other soft,Plastic,Soft Plastic,Non-fishing
-S7,Other plastic bag,Plastic,Soft Plastic,Non-fishing
-BP1,String/rope/ribbon,Plastic,Plastic Straps,Non-fishing
-BP2,Packing strap,Plastic,Plastic Straps,Non-fishing
-BP3,Cable ties,Plastic,Plastic Straps,Non-fishing
-BP4,Unknown/other strap,Plastic,Plastic Straps,Non-fishing
-M1,Pipe,Metal,,Non-fishing
-M2,Wire,Metal,,Non-fishing
-M3,Aerosol,Metal,,Non-fishing
-M4,Beverage can,Metal,,Non-fishing
-M5,Food can/tin,Metal,,Non-fishing
-M6,Lid/cap,Metal,,Non-fishing
-M7,Food wrapper,Metal,,Non-fishing
-M8,Aluminum foil,Metal,,Non-fishing
-M9,Bucket/drum,Metal,,Non-fishing
-M10,Unknown/other hard,Metal,,Non-fishing
-M11,Unknown/other soft,Metal,,Non-fishing
-G1,Beverage bottle,Glass,,Non-fishing
-G2,Jar,Glass,,Non-fishing
-G3,Light globe/tube,Glass,,Non-fishing
-G4,Unknown/other glass,Glass,,Non-fishing
-R1,Thong/shoe,Rubber,,Non-fishing
-R2,Tyre,Rubber,,Non-fishing
-R3,Balloon,Rubber,,Non-fishing
-R4,Rubber band,Rubber,,Non-fishing
-R5,Unknown/other,Rubber,,Non-fishing
-C1,String/rope/strap,Cloth,,Non-fishing
-C2,Clothing/towel,Cloth,,Non-fishing
-C3,Wipes/cloths,Cloth,,Non-fishing
-C4,Insulation/stuffing,Cloth,,Non-fishing
-C5,Unknown/other,Cloth,,Non-fishing
-T1,Wood/timber,Timber,,Non-fishing
-T2,Utensil/food stick,Timber,,Non-fishing
-T3,Bottle cork,Timber,,Non-fishing
-T4,Pallet,Timber,,Non-fishing
-T5,Unknown/other,Timber,,Non-fishing
-D1,Food container,Foam,,Non-fishing
-D2,Cup/plates/bowls,Foam,,Non-fishing
-D3,Polystyrene,Foam,,Non-fishing
-D4,Unknown/other,Foam,,Non-fishing
-P1,Cigarette butt,Plastic,,Non-fishing
-P2,Paper/cardboard,Paper,,Non-fishing
-P3,Magazine/newspaper,Paper,,Non-fishing
-P4,Bag,Paper,,Non-fishing
-P5,Box,Paper,,Non-fishing
-P6,Food container/box,Paper,,Non-fishing
-P7,Food wrapper/bag,Paper,,Non-fishing
-P8,Beverage container,Paper,,Non-fishing
-P9,Cups,Paper,,Non-fishing
-P10,Plates/bowls,Paper,,Non-fishing
-P11,Unknown/other,Paper,,Non-fishing
-F1,Net,Plastic,,Fishing
-F2,Fishing line,Plastic,,Fishing
-F3,Fishing lures,Plastic,,Fishing
-F4,buoys/floats,Plastic,,Fishing
-F5,Glow stick,Plastic,,Fishing
-F6,Fishhook/sinker,Metal,,Fishing
-F7,Unknown/other,Undetermined,,Fishing
-Z1,Battery,E-Waste,,Non-fishing
-Z2,Brick/cement,Brick or Cement,,Non-fishing
-Z3,Carpet,Plastic,,Non-fishing
-Z4,Ceramic,Ceramic,,Non-fishing
-Z5,E-waste,E-Waste,,Non-fishing
-Z6,Furniture,Undetermined,,Non-fishing
-Z7,Appliances,E-Waste,,Non-fishing
-Z8,Large car parts,Undetermined,,Non-fishing
-Z9,Large boat parts,Undetermined,,Non-fishing
-Z10,Bag/box domestic waste,Undetermined,,Non-fishing
-Z11,Nurdles,Plastic,,Non-fishing
-O1,Other,Undetermined,,Non-fishing
-O2,Other,Undetermined,,Non-fishing
-O3,Other,Undetermined,,Non-fishing
-O4,Other,Undetermined,,Non-fishing
-O5,Other,Undetermined,,Non-fishing
-O6,Other,Undetermined,,Non-fishing
+ID,item_name,Material,SubMaterial,Fishing,Dispersiveness
+H1,Pipe/PVC,Plastic,Hard Plastic,Non-fishing,Encumbered drift
+H2,Beverage bottle <1 L,Plastic,Hard Plastic,Non-fishing,Very mobile
+H3,Other bottle,Plastic,Hard Plastic,Non-fishing,Very mobile
+H4,Bottle cap/lid,Plastic,Hard Plastic,Non-fishing,Unencumbered drift
+H5,Food container,Plastic,Hard Plastic,Non-fishing,Encumbered drift
+H6,Utensil/plate/bowl,Plastic,Hard Plastic,Non-fishing,Very mobile
+H7,Bucket/crate,Plastic,Hard Plastic,Non-fishing,Very mobile
+H8,Lighter,Plastic,Hard Plastic,Non-fishing,Very mobile
+H9,Lollipop stick/earbud,Plastic,Hard Plastic,Non-fishing,Very mobile
+H10,Unknown/other hard,Plastic,Hard Plastic,Non-fishing,Unencumbered drift
+S1,Thin film carry bag,Plastic,Soft Plastic,Non-fishing,Encumbered drift
+S2,Food wrapper/label,Plastic,Soft Plastic,Non-fishing,Encumbered drift
+S3,Sheeting,Plastic,Soft Plastic,Non-fishing,Encumbered drift
+S4,Cup/lid,Plastic,Soft Plastic,Non-fishing,Very mobile
+S5,Straw,Plastic,Soft Plastic,Non-fishing,Very mobile
+S6,Unknown/other soft,Plastic,Soft Plastic,Non-fishing,Encumbered drift
+S7,Other plastic bag,Plastic,Soft Plastic,Non-fishing,Encumbered drift
+BP1,String/rope/ribbon,Plastic,Plastic Straps,Non-fishing,Limited dispersion
+BP2,Packing strap,Plastic,Plastic Straps,Non-fishing,Encumbered drift
+BP3,Cable ties,Plastic,Plastic Straps,Non-fishing,Encumbered drift
+BP4,Unknown/other strap,Plastic,Plastic Straps,Non-fishing,Encumbered drift
+M1,Pipe,Metal,,Non-fishing,Limited dispersion
+M2,Wire,Metal,,Non-fishing,Limited dispersion
+M3,Aerosol,Metal,,Non-fishing,Very mobile
+M4,Beverage can,Metal,,Non-fishing,Encumbered drift
+M5,Food can/tin,Metal,,Non-fishing,Limited dispersion
+M6,Lid/cap,Metal,,Non-fishing,Limited dispersion
+M7,Food wrapper,Metal,,Non-fishing,Encumbered drift
+M8,Aluminum foil,Metal,,Non-fishing,Encumbered drift
+M9,Bucket/drum,Metal,,Non-fishing,Encumbered drift
+M10,Unknown/other hard,Metal,,Non-fishing,Limited dispersion
+M11,Unknown/other soft,Metal,,Non-fishing,Limited dispersion
+G1,Beverage bottle,Glass,,Non-fishing,Limited dispersion
+G2,Jar,Glass,,Non-fishing,Limited dispersion
+G3,Light globe/tube,Glass,,Non-fishing,Unencumbered drift
+G4,Unknown/other glass,Glass,,Non-fishing,Limited dispersion
+R1,Thong/shoe,Rubber,,Non-fishing,Unencumbered drift
+R2,Tyre,Rubber,,Non-fishing,Limited dispersion
+R3,Balloon,Rubber,,Non-fishing,Very mobile
+R4,Rubber band,Rubber,,Non-fishing,Unencumbered drift
+R5,Unknown/other,Rubber,,Non-fishing,Limited dispersion
+C1,String/rope/strap,Cloth,,Non-fishing,Encumbered drift
+C2,Clothing/towel,Cloth,,Non-fishing,Encumbered drift
+C3,Wipes/cloths,Cloth,,Non-fishing,Unencumbered drift
+C4,Insulation/stuffing,Cloth,,Non-fishing,Very mobile
+C5,Unknown/other,Cloth,,Non-fishing,Unencumbered drift
+T1,Wood/timber,Timber,,Non-fishing,Encumbered drift
+T2,Utensil/food stick,Timber,,Non-fishing,Unencumbered drift
+T3,Bottle cork,Timber,,Non-fishing,Very mobile
+T4,Pallet,Timber,,Non-fishing,Limited dispersion
+T5,Unknown/other,Timber,,Non-fishing,Encumbered drift
+D1,Food container,Foam,,Non-fishing,Very mobile
+D2,Cup/plates/bowls,Foam,,Non-fishing,Very mobile
+D3,Polystyrene,Foam,,Non-fishing,Very mobile
+D4,Unknown/other,Foam,,Non-fishing,Very mobile
+P1,Cigarette butt,Plastic,,Non-fishing,Very mobile
+P2,Paper/cardboard,Paper,,Non-fishing,Limited dispersion
+P3,Magazine/newspaper,Paper,,Non-fishing,Limited dispersion
+P4,Bag,Paper,,Non-fishing,Limited dispersion
+P5,Box,Paper,,Non-fishing,Limited dispersion
+P6,Food container/box,Paper,,Non-fishing,Limited dispersion
+P7,Food wrapper/bag,Paper,,Non-fishing,Limited dispersion
+P8,Beverage container,Paper,,Non-fishing,Limited dispersion
+P9,Cups,Paper,,Non-fishing,Limited dispersion
+P10,Plates/bowls,Paper,,Non-fishing,Limited dispersion
+P11,Unknown/other,Paper,,Non-fishing,Limited dispersion
+F1,Net,Plastic,,Fishing,Limited dispersion
+F2,Fishing line,Plastic,,Fishing,Limited dispersion
+F3,Fishing lures,Plastic,,Fishing,Limited dispersion
+F4,buoys/floats,Plastic,,Fishing,Very mobile
+F5,Glow stick,Plastic,,Fishing,Unencumbered drift
+F6,Fishhook/sinker,Metal,,Fishing,Limited dispersion
+F7,Unknown/other,Undetermined,,Fishing,Limited dispersion
+Z1,Battery,E-Waste,,Non-fishing,Limited dispersion
+Z2,Brick/cement,Brick or Cement,,Non-fishing,Limited dispersion
+Z3,Carpet,Plastic,,Non-fishing,Limited dispersion
+Z4,Ceramic,Ceramic,,Non-fishing,Limited dispersion
+Z5,E-waste,E-Waste,,Non-fishing,Limited dispersion
+Z6,Furniture,Undetermined,,Non-fishing,Limited dispersion
+Z7,Appliances,E-Waste,,Non-fishing,Limited dispersion
+Z8,Large car parts,Undetermined,,Non-fishing,Limited dispersion
+Z9,Large boat parts,Undetermined,,Non-fishing,Limited dispersion
+Z10,Bag/box domestic waste,Undetermined,,Non-fishing,Limited dispersion
+Z11,Nurdles,Plastic,,Non-fishing,Very mobile
+O1,Other,Undetermined,,Non-fishing,Limited dispersion
+O2,Other,Undetermined,,Non-fishing,Limited dispersion
+O3,Other,Undetermined,,Non-fishing,Limited dispersion
+O4,Other,Undetermined,,Non-fishing,Limited dispersion
+O5,Other,Undetermined,,Non-fishing,Limited dispersion
+O6,Other,Undetermined,,Non-fishing,Limited dispersion

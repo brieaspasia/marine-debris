@@ -25,6 +25,7 @@ library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
+library(gllvm) #for multivariate abundance  
 
 #Tutorial
 #https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
@@ -83,7 +84,85 @@ site_attr <- site_attr %>%
   dplyr::select(Site, CostDis) #select only distance to harbour mouth for join
 site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
 ```
-```{r load-site}
 
+
+```{r glm-2}
+
+#create df to use for models
+mod <- site_select %>%
+  mutate(DistKm = CostDis/100) %>%
+  group_by(Location, Habitat, DistKm, NumberSurveys, ID, Fishing) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m2  <- glmmTMB(Total ~ #Debris count
+                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
+                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
+                 (1|Location) + #site random effect
+                 (1|ID) + #debris type random effect
+                 offset(log(NumberSurveys)), #offset by survey count
+               zi = ~1, #zero inflation
+               family=nbinom1(), #negative binomial to deal with count data with lots of zeros
+               data = mod) 
+
+summary(m2)
+
+#Range of dots on the residuals vs fitted is overdispersion, it's not accounting for the mean variance relationship correctly.  One of our assumptions is that variance is constant.  To fix this, use negative binomial instead of poisson. NBin takes into consideration the dispersion parameter.
 ```
+```{r simulation-output-m2}
+simulationOutput2 <- simulateResiduals(fittedModel = m2, plot=T)
+
+plotResiduals(simulationOutput2)
+
+testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
+
+# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
+# means <- function(x) mean(x) # testing if mean prediction fits
+# testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
+
+testTemporalAutocorrelation(simulationOutput2) #tests for temporal autocorrelation in the residuals
+testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
+```
+```{r gllvm-set-up}
+data(antTraits)
+
+y <- as.matrix(antTraits$abund)
+X <- scale(as.matrix(antTraits$env))
+TR <- antTraits$traits
+
+#TR would be ID type as row, columns would be either fishing vs non-fishing and either heavy, lgt, or entangling
+#Env would be habitat and distKM
+#abund would be ID as columns and survey events as rows
+```
+
+```{r wide-format}
+# Model without predictors:
+gllvm(y, family = "negative.binomial")
+# Model where environmental variables, that is, all variables in X are included:
+gllvm(y, X, family = "negative.binomial")
+# Fourth corner model, where all main effects for environmental variables in X and
+# all interactions between variables in X and variables in TR are included:
+gllvm(y, X, TR, family = "negative.binomial")
+```
+```{r long-format}
+yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
+                colnames(y), v.names = "y", timevar = "sp")
+#id is the site (1:20), sp is the debris ID, y is the count
+TR2 <- data.frame(sp = 1:41, TR)
+datalong <- merge(yX, TR2, by = "sp")
+```
+
+```{r model-long}
+# Model without predictors:
+gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
+# Model with environmental variables Bare.ground and Shrub.cover as predictors
+gllvm(formula = y ~ (Bare.ground + Shrub.cover), data = datalong,  
+      family = "negative.binomial")
+```
+
+
 
