@@ -72,7 +72,7 @@ item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
 item_code <- item_code %>%
-  dplyr::select(ID, item_name) 
+  dplyr::select(ID, item_name, Dispersiveness) 
 ```
 
 ```{r load-site-attributes}
@@ -81,8 +81,12 @@ site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEn
 
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis) #select only distance to harbour mouth for join
-site_select <- left_join(site_select, site_attr, by="Site") #join distance to mouth to main dataset
+  dplyr::select(Site, CostDis) %>% #select only distance to harbour mouth for join
+  mutate(DistKm = CostDis/100) #distance to harbour mouth
+  
+#join distance to mouth to main dataset
+site_select <- left_join(site_select, site_attr, by="Site") 
+  
 ```
 
 
@@ -90,7 +94,6 @@ site_select <- left_join(site_select, site_attr, by="Site") #join distance to mo
 
 #create df to use for models
 mod <- site_select %>%
-  mutate(DistKm = CostDis/100) %>%
   group_by(Location, Habitat, DistKm, NumberSurveys, ID, Fishing) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
@@ -127,7 +130,7 @@ testZeroInflation(simulationOutput2) #tests if there are more zeros than expecte
 testTemporalAutocorrelation(simulationOutput2) #tests for temporal autocorrelation in the residuals
 testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
 ```
-```{r gllvm-set-up}
+```{r gllvm-set-up-vig}
 data(antTraits)
 
 y <- as.matrix(antTraits$abund)
@@ -139,7 +142,42 @@ TR <- antTraits$traits
 #abund would be ID as columns and survey events as rows
 ```
 
-```{r wide-format}
+```{r gllvm-set-up}
+#create abundance dataframe with ID as columns and survey events as rows
+abund <- site_select %>%
+  mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+  group_by(survey_event, ID) %>% 
+  summarise(sum=sum(Total)) %>% #total of each item type per survey event
+  dplyr::select(survey_event, ID, sum)
+
+abund <- spread(abund_test, ID, sum) #convert to data wide
+
+#create env df with habitat and distKm
+env <- antTraits$env
+
+#create survey event as row name, then habitat and distance
+env <- site_select %>%
+  mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+  dplyr::select(survey_event, Habitat, DistKm) %>%
+  distinct()
+
+#convert survey event to rownames
+rownames_to_column(env, var="survey_event")
+
+#convert habitat to numeric
+
+#create trait df with ID type as row and columns are fishing and dispersiveness
+TR <- site_select %>%
+  group_by(ID, Fishing) %>%
+  summarise(sum=sum(Total)) %>%
+  left_join(item_code, by="ID")
+
+y <- as.matrix(abund)
+X <- scale(as.matrix(antTraits$env))
+TR <- antTraits$traits
+```
+
+```{r wide-format-vig}
 # Model without predictors:
 gllvm(y, family = "negative.binomial")
 # Model where environmental variables, that is, all variables in X are included:
@@ -156,7 +194,7 @@ TR2 <- data.frame(sp = 1:41, TR)
 datalong <- merge(yX, TR2, by = "sp")
 ```
 
-```{r model-long}
+```{r model-long-vig}
 # Model without predictors:
 gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
 # Model with environmental variables Bare.ground and Shrub.cover as predictors
