@@ -72,7 +72,7 @@ item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
 item_code <- item_code %>%
-  dplyr::select(ID, item_name, Dispersiveness) 
+  dplyr::select(ID, item_name, Fishing, Dispersiveness) 
 ```
 
 ```{r load-site-attributes}
@@ -133,48 +133,78 @@ testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation
 ```{r gllvm-set-up-vig}
 data(antTraits)
 
-y <- as.matrix(antTraits$abund)
-X <- scale(as.matrix(antTraits$env))
-TR <- antTraits$traits
+antAbund <- antTraits$abund
+antEnv <- antTraits$env
+antTR <- antTraits$traits
 
-#TR would be ID type as row, columns would be either fishing vs non-fishing and either heavy, lgt, or entangling
-#Env would be habitat and distKM
-#abund would be ID as columns and survey events as rows
+anty <- as.matrix(antTraits$abund)
+antX <- scale(as.matrix(antTraits$env))
+antTR <- antTraits$traits
+
+str(antTR)
 ```
 
 ```{r gllvm-set-up}
-#create abundance dataframe with ID as columns and survey events as rows
-abund <- site_select %>%
-  mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-  group_by(survey_event, ID) %>% 
-  summarise(sum=sum(Total)) %>% #total of each item type per survey event
-  dplyr::select(survey_event, ID, sum)
+#Abundance
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
 
-abund <- spread(abund_test, ID, sum) #convert to data wide
+#Environment
+  #create survey event and filter zero sum surveys, 
+    env <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>%
+      group_by(survey_event) %>%
+      mutate(sum=sum(Total)) %>%
+      filter(sum>0) %>%
+      dplyr::select(survey_event, Habitat, DistKm) %>%
+      distinct()
+    
+  #convert survey event to rowname
+  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
+  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  #convert Habitat to numeric
+  env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
+  env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
 
-#create env df with habitat and distKm
-env <- antTraits$env
+#Traits
+  
+  #create column of usable IDs to join
+  IDs <- abund %>%
+    gather(ID, sum) %>%
+    dplyr::select(ID) %>%
+    unique()
+  #create trait df with ID type as row and columns are fishing and dispersiveness
+  TR <- site_select %>%
+    group_by(ID) %>%
+    summarise(sum=sum(Total)) %>%
+    left_join(item_code, by="ID") %>%
+    dplyr::select(ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>%
+    column_to_rownames(var="ID") #create rownames from ID
 
-#create survey event as row name, then habitat and distance
-env <- site_select %>%
-  mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-  dplyr::select(survey_event, Habitat, DistKm) %>%
-  distinct()
-
-#convert survey event to rownames
-rownames_to_column(env, var="survey_event")
-
-#convert habitat to numeric
-
-#create trait df with ID type as row and columns are fishing and dispersiveness
-TR <- site_select %>%
-  group_by(ID, Fishing) %>%
-  summarise(sum=sum(Total)) %>%
-  left_join(item_code, by="ID")
+  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
+  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
 
 y <- as.matrix(abund)
-X <- scale(as.matrix(antTraits$env))
-TR <- antTraits$traits
+X <- scale(as.matrix(env))
+TR <- TR
 ```
 
 ```{r wide-format-vig}
@@ -190,7 +220,7 @@ gllvm(y, X, TR, family = "negative.binomial")
 yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
                 colnames(y), v.names = "y", timevar = "sp")
 #id is the site (1:20), sp is the debris ID, y is the count
-TR2 <- data.frame(sp = 1:41, TR)
+TR2 <- data.frame(sp = 1:62, TR)
 datalong <- merge(yX, TR2, by = "sp")
 ```
 
@@ -198,7 +228,7 @@ datalong <- merge(yX, TR2, by = "sp")
 # Model without predictors:
 gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
 # Model with environmental variables Bare.ground and Shrub.cover as predictors
-gllvm(formula = y ~ (Bare.ground + Shrub.cover), data = datalong,  
+gllvm(formula = y ~ (Habitat + DistKm + Dispersiveness + Fishing), data = datalong,  
       family = "negative.binomial")
 ```
 
