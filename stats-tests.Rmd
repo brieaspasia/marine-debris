@@ -130,20 +130,6 @@ testZeroInflation(simulationOutput2) #tests if there are more zeros than expecte
 testTemporalAutocorrelation(simulationOutput2) #tests for temporal autocorrelation in the residuals
 testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
 ```
-```{r gllvm-set-up-vig}
-data(antTraits)
-
-antAbund <- antTraits$abund
-antEnv <- antTraits$env
-antTR <- antTraits$traits
-
-anty <- as.matrix(antTraits$abund)
-antX <- scale(as.matrix(antTraits$env))
-antTR <- antTraits$traits
-
-str(antTR)
-```
-
 ```{r gllvm-set-up}
 #Abundance
   #create abundance dataframe with ID as columns and survey events as rows
@@ -231,6 +217,36 @@ gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
 gllvm(formula = y ~ (Habitat + DistKm + Dispersiveness + Fishing), data = datalong,  
       family = "negative.binomial")
 ```
+```{r AR1-setup-vignette}
+## Number of time points
+n <- 6  
 
+## Simulate the process using the MASS
+x <- mvrnorm(mu = rep(0,n),
+             Sigma = .7 ^ as.matrix(dist(1:n)) )
+
+## Add measurement noise
+y <- x + rnorm(n)    
+
+#Specify time variable as a factor
+times <- factor(1:n, levels=1:n)
+levels(times)
+
+#Assign a grouping variable
+group <- factor(rep(1,n))
+
+#combine data into a single df
+dat0 <- data.frame(y,times,group)
+
+#fit the model
+glmmTMB(y ~ ar1(times + 0 | group), data=dat0)
+```
+
+```{r AR1-setup}
+n <- site_select$NumberSurveys                      ## Number of time points
+x <- mvrnorm(mu = rep(0,n),
+             Sigma = .7 ^ as.matrix(dist(1:n)) )    ## Simulate the process using the MASS package
+y <- x + rnorm(n)                                   ## Add measurement noise
+```
 
 
