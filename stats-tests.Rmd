@@ -193,7 +193,7 @@ X <- scale(as.matrix(env))
 TR <- TR
 ```
 
-```{r wide-format-vig}
+```{r wide-format}
 # Model without predictors:
 gllvm(y, family = "negative.binomial")
 # Model where environmental variables, that is, all variables in X are included:
@@ -210,10 +210,10 @@ TR2 <- data.frame(sp = 1:62, TR)
 datalong <- merge(yX, TR2, by = "sp")
 ```
 
-```{r model-long-vig}
+```{r model-long}
 # Model without predictors:
 gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
-# Model with environmental variables Bare.ground and Shrub.cover as predictors
+# Model with environmental and trait variables as predictors
 gllvm(formula = y ~ (Habitat + DistKm + Dispersiveness + Fishing), data = datalong,  
       family = "negative.binomial")
 ```
@@ -244,9 +244,6 @@ glmmTMB(y ~ ar1(times + 0 | group), data=dat0)
 
 ```{r AR1-setup}
 n <- site_select$NumberSurveys                      ## Number of time points
-x <- mvrnorm(mu = rep(0,n),
-             Sigma = .7 ^ as.matrix(dist(1:n)) )    ## Simulate the process using the MASS package
-y <- x + rnorm(n)                                   ## Add measurement noise
 ```
 
 
