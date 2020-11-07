@@ -200,7 +200,11 @@ gllvm(y, family = "negative.binomial")
 gllvm(y, X, family = "negative.binomial")
 # Fourth corner model, where all main effects for environmental variables in X and
 # all interactions between variables in X and variables in TR are included:
-gllvm(y, X, TR, family = "negative.binomial")
+fit_wide <- gllvm(y, X, TR, family = "negative.binomial")
+
+summary(fit_wide)
+
+plot(fit_wide)
 ```
 ```{r long-format}
 yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
@@ -214,9 +218,15 @@ datalong <- merge(yX, TR2, by = "sp")
 # Model without predictors:
 gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
 # Model with environmental and trait variables as predictors
-gllvm(formula = y ~ (Habitat + DistKm + Dispersiveness + Fishing), data = datalong,  
-      family = "negative.binomial")
+fit_allfixed <- gllvm(data=datalong, 
+                      formula = y ~ Habitat + DistKm + 
+                        (Habitat + DistKm) : (Dispersiveness + Fishing), 
+                      family = "negative.binomial")
+coefplot(fit_allfixed)
+plot(fit_allfixed)
 ```
+
+
 ```{r AR1-setup-vignette}
 ## Number of time points
 n <- 6  
