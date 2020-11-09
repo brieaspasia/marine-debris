@@ -129,6 +129,9 @@ testZeroInflation(simulationOutput2) #tests if there are more zeros than expecte
 
 testTemporalAutocorrelation(simulationOutput2) #tests for temporal autocorrelation in the residuals
 testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
+
+plotQQunif(m2, testDispersion=FALSE)
+
 ```
 ```{r gllvm-set-up}
 #Abundance

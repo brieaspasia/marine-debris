@@ -68,6 +68,9 @@ sampling_dates <- sampling_dates %>%
 
 #join survey count to site select
 site_select <- left_join(site_select, sampling_dates, by="Location")
+
+site_select %>%
+  summarise(sum=sum(Total))
 ```
 
 ```{r load-item-code}
@@ -223,6 +226,25 @@ p_total_SS
 ggsave(filename = "figures/total_SS.png", plot = p_total_P, dpi = 600)
 ```
 ```{r top-items-per-habitat}
+total_per_habitat_site <- site_select %>%
+  group_by(Habitat, Location) %>% #separate the items by habitat type
+  mutate(mean=sum(Total)/NumberSurveys, #sum of total items by type
+         sd=sd(Total)) %>% #sd of total items by type
+        dplyr::select(Habitat, Location, mean, sd) %>% #remove irrelevant columns
+        arrange(desc(mean)) %>% #show high counts first
+        distinct() %>% #remove duplicate entries
+        ungroup()
+
+write.csv(total_per_habitat_site, "output/habitat_site.csv", row.names = FALSE) #save this data frame as a csv file
+
+p_habitat <- total_per_habitat_site %>%
+  ggplot( aes(x=Habitat, y=mean, fill=Habitat)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  facet_wrap(~Location, scales="free_y")
+
+p_habitat
+
 #Is the top items list different by habitat than the overall top items in chunk 7?
 item_total_per_habitat <- site_select %>%
   group_by(Habitat, ID) %>% #separate the items by habitat type
