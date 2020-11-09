@@ -91,10 +91,11 @@ site_select <- left_join(site_select, site_attr, by="Site")
 
 
 ```{r glm-2}
+#create an ID for each survey event as a factor and use that for AR1.
 
 #create df to use for models
 mod <- site_select %>%
-  group_by(Location, Habitat, DistKm, NumberSurveys, ID, Fishing) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm, NumberSurveys, ID, Fishing) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
@@ -103,6 +104,7 @@ m2  <- glmmTMB(Total ~ #Debris count
                  Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
                  (1|Location) + #site random effect
                  (1|ID) + #debris type random effect
+                 ar1(Date + 0 | Location) +
                  offset(log(NumberSurveys)), #offset by survey count
                zi = ~1, #zero inflation
                family=nbinom1(), #negative binomial to deal with count data with lots of zeros
@@ -222,7 +224,7 @@ datalong <- merge(yX, TR2, by = "sp")
 gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
-                      formula = y ~ Habitat + DistKm + 
+                      formula = y ~ 0 + Habitat + DistKm + 
                         (Habitat + DistKm) : (Dispersiveness + Fishing), 
                       family = "negative.binomial")
 coefplot(fit_allfixed)
@@ -264,7 +266,7 @@ group <- factor(rep(1,n))
 dat0 <- data.frame(y,times,group)
 
 #fit the model
-glmmTMB(y ~ ar1(times + 0 | group), data=dat0)
+glmmTMB(y ~ ar1(times + 0 | group), data=dat0) #is group the site?  times would be the date?
 ```
 
 ```{r AR1-setup}
