@@ -95,7 +95,7 @@ site_select <- left_join(site_select, site_attr, by="Site")
 
 #create df to use for models
 mod <- site_select %>%
-  group_by(Date, Location, Habitat, DistKm, NumberSurveys, ID, Fishing) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm, NumberSurveys, Fishing) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
@@ -103,8 +103,8 @@ m2  <- glmmTMB(Total ~ #Debris count
                  Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
                  Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
                  (1|Location) + #site random effect
-                 (1|ID) + #debris type random effect
-                 ar1(Date + 0 | Location) +
+                 # (1|ID) + #debris type random effect
+                 # ar1(Date + 0 | Location) +
                  offset(log(NumberSurveys)), #offset by survey count
                zi = ~1, #zero inflation
                family=nbinom1(), #negative binomial to deal with count data with lots of zeros
@@ -116,7 +116,7 @@ summary(m2)
 ```
 ```{r simulation-output-m2}
 simulationOutput2 <- simulateResiduals(fittedModel = m2, plot=T)
-
+  
 plotResiduals(simulationOutput2)
 
 testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
@@ -129,12 +129,56 @@ testZeroInflation(simulationOutput2) #tests if there are more zeros than expecte
 # means <- function(x) mean(x) # testing if mean prediction fits
 # testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
 
-testTemporalAutocorrelation(simulationOutput2) #tests for temporal autocorrelation in the residuals
-testSpatialAutocorrelation(simulationOutput2) #tests for spatial autocorrelation in the residuals. Can also be used with a generic distance function
-
 plotQQunif(m2, testDispersion=FALSE)
-
 ```
+```{r testing-temporal-autocorrelation}
+#creating a column from the model residuals
+mod$resid = resid(m2)
+
+#Clifton Gardens - DW = 3.301, p-value = 0.05987
+  m_clift <- mod %>%
+    filter(Location=="CLIFT") %>% 
+    group_by(Date) %>%
+    summarise(sum=sum(resid))
+  
+  testTemporalAutocorrelation(m_clift$sum, 
+                              time =  m_clift$Date) #test resid for temporal autocorrelation
+
+#Double Bay - DW = 2.2347, p-value = 0.8496
+  m_doubl <- mod %>%
+    filter(Location=="DOUBL") %>%
+    group_by(Date) %>%
+    summarise(sum=sum(resid))
+  
+  testTemporalAutocorrelation(m_doubl$sum, 
+                              time =  m_doubl$Date) #test resid for temporal autocorrelation
+
+#Neutral Bay - DW = 2.767, p-value = 0.3581
+  m_neutr <- mod %>%
+    filter(Location=="NEUTR") %>%
+    group_by(Date) %>%
+    summarise(sum=sum(resid))
+  
+  testTemporalAutocorrelation(m_neutr$sum, 
+                              time =  m_neutr$Date) #test resid for temporal autocorrelation
+#Parsley Bay - DW = 1.2492, p-value = 0.4578
+    m_parsl <- mod %>%
+    filter(Location=="PARSL") %>%
+    group_by(Date) %>%
+    summarise(sum=sum(resid))
+  
+  testTemporalAutocorrelation(m_parsl$sum, 
+                              time =  m_parsl$Date) #test resid for temporal autocorrelation
+#Watsons Bay - DW = 2.8324, p-value = 0.3741
+    m_watso <- mod %>%
+    filter(Location=="WATSO") %>%
+    group_by(Date) %>%
+    summarise(sum=sum(resid))
+  
+  testTemporalAutocorrelation(m_watso$sum, 
+                              time =  m_watso$Date) #test resid for temporal autocorrelation
+```
+
 ```{r gllvm-set-up}
 #Abundance
   #create abundance dataframe with ID as columns and survey events as rows
