@@ -1,13 +1,22 @@
 ---
 title: "stats-tests"
-output: html_document
+author: "Brie Sherow"
+date: "11/11/2020"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+    df_print: paged
+  pdf_document:
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r load-libraries, echo=TRUE}
+```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
 library(ggplot2) #graphing
 library(ggthemes) #graphing templates
 library(hrbrthemes) #graphing templates
@@ -25,12 +34,17 @@ library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
-library(gllvm) #for multivariate abundance  
+library(gllvm) #for multivariate abundance
+library(lattice) #fourth corner heatmap
 
 #Tutorial
 #https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
 ```
+# Supplementary Materials 
+The repository used to store this data can be found at [https://github.com/brieaspasia/marine-debris](https://github.com/brieaspasia/marine-debris)
 
+# Site selection
+10 sites at 5 locations were surveyed between 3-5 times each during summer 2019-2020.
 ```{r create-site-select}
 #read in processed survey data
 data <- read.csv(file="data/all_data.csv", 
@@ -65,6 +79,8 @@ sampling_dates <- sampling_dates %>%
 site_select <- left_join(site_select, sampling_dates, by="Location")
 ```
 
+# Debris Types
+CSIRO debris classification system was modified to assign a material type and whether fishing or non-fishing related for each debris item.  Dispersiveness was added as a trait using Tangaroa Blue classification system.
 ```{r load-item-code}
 #load item names
 item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
@@ -75,6 +91,8 @@ item_code <- item_code %>%
   dplyr::select(ID, item_name, Fishing, Dispersiveness) 
 ```
 
+# Site Attributes
+Each location included a 25m transect at a pier and an adjacent 25m soft sediment site in an area of boat traffic.  Distance from harbour mouth was calculated using ArcGIS Cost Distance analysis.
 ```{r load-site-attributes}
 #load site coords and distance from harbour mouth
 site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
@@ -89,13 +107,18 @@ site_select <- left_join(site_select, site_attr, by="Site")
   
 ```
 
+# GLMM model
+Regression isolates the relationship between each independent variable (Habitat and distance) and the dependent variable (Total debris). Total debris count predicted by habitat (pier or sediment) and distance from harbour mouth, both affected by fishing and with location as a random effect.  Offset by the number of surveys at each site to account for differing counts.  Using negative binomial because it is count data with a high number of zeros, and an additional zero inflation because of the zeros.
 
-```{r glm-2}
-#create an ID for each survey event as a factor and use that for AR1.
+Debris type is not considered as a random effect because in this instance it is the total debris count that matters rather than the individual debris types.  Accumulation due to repeat surveys is also not considered as the temporal autocorrelation does not indicate that repeat surveys are significant (see below).
 
+
+```{r glm-2, warning=FALSE, message=FALSE}
 #create df to use for models
 mod <- site_select %>%
-  group_by(Date, Location, Habitat, DistKm, NumberSurveys, Fishing) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm, NumberSurveys, 
+           ID,
+           Fishing) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
@@ -103,37 +126,33 @@ m2  <- glmmTMB(Total ~ #Debris count
                  Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
                  Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
                  (1|Location) + #site random effect
-                 # (1|ID) + #debris type random effect
+                 (1|ID) + #debris type random effect
                  # ar1(Date + 0 | Location) +
                  offset(log(NumberSurveys)), #offset by survey count
                zi = ~1, #zero inflation
                family=nbinom1(), #negative binomial to deal with count data with lots of zeros
                data = mod) 
+```
+#Model summary
+P values are all less than 0.05, indicating significance.
 
+```{r model-summary}
 summary(m2)
-
-#Range of dots on the residuals vs fitted is overdispersion, it's not accounting for the mean variance relationship correctly.  One of our assumptions is that variance is constant.  To fix this, use negative binomial instead of poisson. NBin takes into consideration the dispersion parameter.
 ```
-```{r simulation-output-m2}
-simulationOutput2 <- simulateResiduals(fittedModel = m2, plot=T)
-  
-plotResiduals(simulationOutput2)
 
-testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
+# Regression coefficients
+This is the mean change in the dependent (total debris) variable for each 1 unit change in an independent (habitat and distance) variable.  For instance, each km more from the harbour results in -0.365 less debris items.  Soft sediment sites are likely to have -3.141 less count per item than pier sites.
 
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
+#I'm not sure how to explain the coefficients on the fishing effect?  And is the intercept the pier sites?  I still get so confused about the intercept and how the model chooses it alphabetically...
 
-plotQQunif(m2, testDispersion=FALSE)
+```{r coefficients}
+coef(m2)
 ```
-```{r testing-temporal-autocorrelation}
+# Testing temporal autocorrelation
+Despite repeat surveys at each site, temporal autocorrelation testing shows that the effect of repeat surveys is not significant.  This is likely due to the fact that the initial surveys did not actually function as baseline cleans because the sites took many trips to clean and pier sites were never cleared completely.
+```{r testing-temporal-autocorrelation, warning=FALSE, message=FALSE, results="hide"}
 #creating a column from the model residuals
-mod$resid = resid(m2)
+mod$resid = resid(m2) #create a column for each survey event's residuals
 
 #Clifton Gardens - DW = 3.301, p-value = 0.05987
   m_clift <- mod %>%
@@ -179,7 +198,30 @@ mod$resid = resid(m2)
                               time =  m_watso$Date) #test resid for temporal autocorrelation
 ```
 
-```{r gllvm-set-up}
+# DHARMa Simulation Output
+If I take out the debris type (ID) as a random effect, the residual graph lines are red.  If I leave in the debris type as a random effect then the KS test on the QQ plot is red.  I don't know why these are throwing errors when we had them working before?
+
+```{r simulation-output-m2}
+simulationOutput2 <- simulateResiduals(fittedModel = m2, plot=T)
+  
+plotResiduals(simulationOutput2)
+
+# testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
+# testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
+# testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
+# testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+# testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
+
+# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
+# means <- function(x) mean(x) # testing if mean prediction fits
+# testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
+
+plotQQunif(m2, testDispersion=FALSE)
+```
+
+# Fourth corner model set-up
+Creating dataframes for abundance of debris types, environmental variables, and traits of each debris type.
+```{r gllvm-set-up, warning=FALSE, message=FALSE, results="hide"}
 #Abundance
   #create abundance dataframe with ID as columns and survey events as rows
   abund_long <- site_select %>%
@@ -242,7 +284,7 @@ X <- scale(as.matrix(env))
 TR <- TR
 ```
 
-```{r wide-format}
+```{r wide-format, warning=FALSE, message=FALSE, results="hide"}
 # Model without predictors:
 gllvm(y, family = "negative.binomial")
 # Model where environmental variables, that is, all variables in X are included:
@@ -255,28 +297,29 @@ summary(fit_wide)
 
 plot(fit_wide)
 ```
-```{r long-format}
+```{r long-format, warning=FALSE, message=FALSE, results="hide"}
 yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
                 colnames(y), v.names = "y", timevar = "sp")
 #id is the site (1:20), sp is the debris ID, y is the count
 TR2 <- data.frame(sp = 1:62, TR)
 datalong <- merge(yX, TR2, by = "sp")
 ```
+# Fourth corner model
+Coefficient plot shows that there are a few significant variables including Habitat affected by fishing, habitat on its own, and the dispersiveness category of unencumbered drift.  
 
+#Is the unencumbered drift affected by something off-screen?  It looks like it's cutting off the text on the left.  Also, not quite sure how to read the plots.
 ```{r model-long}
-# Model without predictors:
-gllvm(formula = y ~ 1, data = datalong, family = "negative.binomial")
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
                       formula = y ~ 0 + Habitat + DistKm + 
                         (Habitat + DistKm) : (Dispersiveness + Fishing), 
                       family = "negative.binomial")
 coefplot(fit_allfixed)
-plot(fit_allfixed)
+# plot(fit_allfixed)
 ```
+# Fourth corner heatmap
+Here we see that nothing is significantly interacting with distance, however both fishing and unencumbered drift are interacting with habitat significantly.
 ```{r 4th-corner-heatmap}
-#why is this missing 'Encumbered drift'?  And what does this mean?
-library(lattice)
 coefplot(fit_allfixed, mar = c(4, 11, 1, 1), cex.ylab = 0.8)
 fourth <- fit_allfixed$fourth.corner
 a <- max( abs(fourth) )
@@ -288,7 +331,7 @@ plot.4th
 ```
 
 
-```{r AR1-setup-vignette-example}
+```{r AR1-setup-vignette-example, include=FALSE, results="hide"}
 ## Number of time points
 n <- 6  
 
@@ -311,10 +354,6 @@ dat0 <- data.frame(y,times,group)
 
 #fit the model
 glmmTMB(y ~ ar1(times + 0 | group), data=dat0) #is group the site?  times would be the date?
-```
-
-```{r AR1-setup}
-n <- site_select$NumberSurveys                      ## Number of time points
 ```
 
 
