@@ -77,6 +77,9 @@ sampling_dates <- sampling_dates %>%
 
 #join survey count to site select
 site_select <- left_join(site_select, sampling_dates, by="Location")
+
+site_select <- site_select %>%
+  mutate(survey_event = paste(Date, Site,sep=" "))
 ```
 
 # Debris Types
@@ -116,9 +119,8 @@ Debris type is not considered as a random effect because in this instance it is 
 ```{r glm-2, warning=FALSE, message=FALSE}
 #create df to use for models
 mod <- site_select %>%
-  group_by(Date, Location, Habitat, DistKm, NumberSurveys, 
-           ID,
-           Fishing) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm, NumberSurveys,
+           Fishing, survey_event) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
@@ -126,7 +128,6 @@ m2  <- glmmTMB(Total ~ #Debris count
                  Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
                  Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
                  (1|Location) + #site random effect
-                 (1|ID) + #debris type random effect
                  # ar1(Date + 0 | Location) +
                  offset(log(NumberSurveys)), #offset by survey count
                zi = ~1, #zero inflation
@@ -141,7 +142,7 @@ summary(m2)
 ```
 
 # Regression coefficients
-This is the mean change in the dependent (total debris) variable for each 1 unit change in an independent (habitat and distance) variable.  For instance, each km more from the harbour results in -0.365 less debris items.  Soft sediment sites are likely to have -3.141 less count per item than pier sites.
+This is the mean change in the dependent (total debris) variable for each 1 unit change in an independent (habitat and distance) variable.  For instance, each km more from the harbour results in -0.327 less debris items.  Soft sediment sites are likely to have -3.556 less count per item than pier sites.
 
 #I'm not sure how to explain the coefficients on the fishing effect?  And is the intercept the pier sites?  I still get so confused about the intercept and how the model chooses it alphabetically...
 
@@ -208,7 +209,7 @@ plotResiduals(simulationOutput2)
 
 # testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
 # testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
-# testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
+testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
 # testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 # testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
 

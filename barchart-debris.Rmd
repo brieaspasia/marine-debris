@@ -69,6 +69,9 @@ sampling_dates <- sampling_dates %>%
 #join survey count to site select
 site_select <- left_join(site_select, sampling_dates, by="Location")
 
+site_select <- site_select %>%
+  mutate(survey_event = paste(Date, Site,sep=" "))
+
 site_select %>%
   summarise(sum=sum(Total))
 ```
