@@ -91,7 +91,9 @@ item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",")
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
 item_code <- item_code %>%
-  dplyr::select(ID, item_name, Fishing, Dispersiveness) 
+  dplyr::select(ID, item_name) 
+
+site_select <- left_join(site_select, item_code, by="ID") 
 ```
 
 # Site Attributes
@@ -120,19 +122,21 @@ Debris type is not considered as a random effect because in this instance it is 
 #create df to use for models
 mod <- site_select %>%
   group_by(Date, Location, Habitat, DistKm, NumberSurveys,
-           Fishing, survey_event) %>% #relevant variables
+           Fishing) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m2  <- glmmTMB(Total ~ #Debris count
                  Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
                  Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
-                 (1|Location) + #site random effect
+                 (1|Location/Date) + #site random effect
+                 # (1|Dispersiveness) + #dispersiveness random effect
                  # ar1(Date + 0 | Location) +
                  offset(log(NumberSurveys)), #offset by survey count
                zi = ~1, #zero inflation
                family=nbinom1(), #negative binomial to deal with count data with lots of zeros
                data = mod) 
+
 ```
 #Model summary
 P values are all less than 0.05, indicating significance.
@@ -210,7 +214,7 @@ plotResiduals(simulationOutput2)
 # testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
 # testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
-# testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 # testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
 
 # #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
