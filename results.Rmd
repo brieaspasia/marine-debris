@@ -84,7 +84,9 @@ site_select <- site_select %>%
 CSIRO debris classification system was modified to assign a material type and whether they are fishing or non-fishing related for each debris item.  Dispersiveness was added as a trait using Tangaroa Blue classification system.
 ```{r load-item-code}
 #load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+item_code <- read.csv(file="data/CSIRO-code.csv", 
+                      header=T, sep=",",
+                       fileEncoding="UTF-8-BOM") #removes special characters
 
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
@@ -330,7 +332,9 @@ Determining the significance of environmental traits and debris attributes.
 #Traits
   
   #load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+item_code <- read.csv(file="data/CSIRO-code.csv", 
+                      header=T, sep=",",
+                      fileEncoding="UTF-8-BOM") #removes special characters
 
   #filter out material as some item types may have more than one material type 
   #(ex. fishing items, furniture)
@@ -367,7 +371,7 @@ datalong <- merge(yX, TR2, by = "sp")
 ```
 
 # Fourth corner analysis
-Here we see that nothing is interacting significantly with distance to harbour mouth, however both fishing and unencumbered drift are interacting with habitat significantly.
+Here we see that nothing is interacting significantly with distance to harbour mouth, however both fishing and encumbered drift are interacting with habitat significantly.
 ```{r 4th-corner-heatmap, fig.cap="Figure 5: Fourth corner heatmap"}
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
