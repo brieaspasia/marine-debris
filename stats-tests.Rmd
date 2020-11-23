@@ -129,12 +129,12 @@ mod <- site_select %>%
 m2  <- glmmTMB(Total ~ #Debris count
                  Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
                  Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
-                 (1|Location/Date) + #site random effect
+                 (1|Location/Date), #site random effect
                  # (1|Dispersiveness) + #dispersiveness random effect
                  # ar1(Date + 0 | Location) +
-                 offset(log(NumberSurveys)), #offset by survey count
-               zi = ~1, #zero inflation
-               family=nbinom1(), #negative binomial to deal with count data with lots of zeros
+                 # offset(log(NumberSurveys)), #offset by survey count
+               # zi = ~1, #zero inflation
+               family=nbinom2(), #negative binomial to deal with count data and zeros
                data = mod) 
 
 ```
@@ -204,22 +204,21 @@ mod$resid = resid(m2) #create a column for each survey event's residuals
 ```
 
 # DHARMa Simulation Output
-If I take out the debris type (ID) as a random effect, the residual graph lines are red.  If I leave in the debris type as a random effect then the KS test on the QQ plot is red.  I don't know why these are throwing errors when we had them working before?
 
 ```{r simulation-output-m2}
-simulationOutput2 <- simulateResiduals(fittedModel = m2, plot=T)
+simulationOutput <- simulateResiduals(fittedModel = m2, plot=T)
   
-plotResiduals(simulationOutput2)
+plotResiduals(simulationOutput)
 
-# testUniformity(simulationOutput2) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput2) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput2) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput2) #tests if there are more zeros than expected
+# testUniformity(simulationOutput) #tests if the overall distribution conforms to expectations
+# testOutliers(simulationOutput) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+# testZeroInflation(simulationOutput) #tests if there are more zeros than expected
 
 # #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
 # means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput2, summary = means) #test if a generic summary statistics deviates from model expectations
+# testGeneric(simulationOutput, summary = means) #test if a generic summary statistics deviates from model expectations
 
 plotQQunif(m2, testDispersion=FALSE)
 ```

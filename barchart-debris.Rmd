@@ -73,6 +73,7 @@ site_select <- site_select %>%
   mutate(survey_event = paste(Date, Site,sep=" "))
 
 site_select %>%
+  group_by(Habitat) %>%
   summarise(sum=sum(Total))
 ```
 

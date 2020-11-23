@@ -1,0 +1,385 @@
+---
+title: "Results"
+author: "Brie Sherow"
+date: "23/11/2020"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+    df_print: paged
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
+library(ggplot2) #graphing
+library(ggthemes) #graphing templates
+library(hrbrthemes) #graphing templates
+library(lubridate) #date manipulation
+library(forcats) #working with factors
+library(tidyverse) #manipulating data
+library(knitr) #rmarkdown functions
+library(kableExtra) #table layouts
+library(magick) #image processing
+library(stats) #R stats functions
+library(broom) #create summaries from stats objects
+library(car) #lm regression
+library(MASS) #stats
+library(lme4) #glmer function
+library(DHARMa) #testing model diagnostics
+library(glmmTMB) #fit zero-inflated negative binomial
+library(mvabund) #for multivariate stats
+library(gllvm) #for multivariate abundance
+library(lattice) #fourth corner heatmap
+```
+
+# Supplementary materials
+The repository used to store this data can be found at [https://github.com/brieaspasia/marine-debris](https://github.com/brieaspasia/marine-debris)
+
+# Site selection
+10 sites at 5 locations were surveyed between 3-5 times each during summer 2019-2020.
+```{r create-site-select}
+#read in processed survey data
+data <- read.csv(file="data/all_data.csv", 
+                 header=T, sep=",", 
+                 fileEncoding="UTF-8-BOM") #removes special characters
+
+data$Date <- dmy(data$Date) 
+data$Notes <- as.character(data$Notes)
+
+#keep only unsw surveys and sites with public piers and >2 survey rounds
+site_select <- data %>%
+  filter(Team=="UNSW" & 
+           Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
+  dplyr::select(-Habitat2, -Fragment, -Whole)
+
+#create a df for survey count per site
+sampling_dates <- data %>%
+  group_by(Location) %>%
+  filter(Team=="UNSW") %>%
+  count(Date)
+
+#take away n
+sampling_dates$n <- NULL
+
+#create a column for survey count per site
+sampling_dates <- sampling_dates %>%
+  count(Location) %>%
+  arrange(desc(n)) %>%
+  rename(NumberSurveys=n)
+
+#join survey count to site select
+site_select <- left_join(site_select, sampling_dates, by="Location")
+
+site_select <- site_select %>%
+  mutate(survey_event = paste(Date, Site,sep=" "))
+```
+
+# Debris types
+CSIRO debris classification system was modified to assign a material type and whether they are fishing or non-fishing related for each debris item.  Dispersiveness was added as a trait using Tangaroa Blue classification system.
+```{r load-item-code}
+#load item names
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+
+#filter out material as some item types may have more than one material type 
+#(ex. fishing items, furniture)
+item_code <- item_code %>%
+  dplyr::select(ID, item_name, Dispersiveness) 
+
+site_select <- left_join(site_select, item_code, by="ID") 
+```
+
+# Site attributes
+Each location included a 25m transect at a pier and an adjacent 25m soft sediment site in an area of boat traffic.  Distance from harbour mouth was calculated using ArcGIS Cost Distance analysis.
+```{r load-site-attributes}
+#load site coords and distance from harbour mouth
+site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
+
+#add distance to harbour mouth to site_select data
+site_attr <- site_attr %>%
+  dplyr::select(Site, CostDis) %>% #select only distance to harbour mouth for join
+  mutate(DistKm = CostDis/100) #distance to harbour mouth
+  
+#join distance to mouth to main dataset
+site_select <- left_join(site_select, site_attr, by="Site") 
+```
+# Results
+We accomplished 36 survey events at 10 sites between November 2019 and February 2020 and recorded 2,803 unique debris items.  
+
+## Mean debris items per site
+Here we see the proportion of debris items recovered under piers in blue, and the proportion recovered on soft sediment in orange.  In total across all sites, over 90% of the total debris recorded was collected under piers. The mean debris count at each site indicates that debris increases closer to the harbour mouth. 
+```{r results-map, fig.cap="Fig 1: Mean debris count and proportion per habitat", out.width = '100%'}
+knitr::include_graphics("images/results-map.png")
+```
+## Top twenty items
+The most common item across all surveys was fishing line, at nearly 60% of the total debris recorded.  All other item types accounted for less than 10% of items total, with glass bottles, fishhooks/sinkers, and metal scraps (some fishing related) rounding out the top five.
+```{r top-items, fig.cap="Table 1: Top twenty debris types across all surveys"}
+#Find the top item types across all surveys
+total_item <- site_select %>%
+  group_by(Material, ID) %>%
+  mutate(sum=sum(Total), #sum of total items by type
+         sd=sd(Total)) %>% #sd of total items by type
+        dplyr::select(ID, Material, sum, sd) %>% #remove irrelevant columns
+        filter(sum>0) %>% #remove zero values
+        arrange(desc(sum)) %>% #show high counts first
+        distinct() %>% #remove duplicate entries
+        ungroup()
+
+total_item <- left_join(total_item, item_code, by="ID") #join item names
+
+top_items <- total_item %>% top_n(20, sum) #show top 20 items total
+
+top_items <- top_items %>%
+           mutate(pct=sum/sum(sum)*100)
+
+top20items <- top_items %>%
+  dplyr::select(-Dispersiveness) %>%
+  mutate_if(is.numeric, format, digits=2) %>%
+  kable("html", 
+      col.names = c("ID", "Material", "Sum", "SD", "Name", "Percent"),
+      caption = "Top 20 items across all surveys") %>% 
+  kable_styling(bootstrap_options="condensed", position="left")
+top20items #print table
+``` 
+## Top items per habitat type
+Glass bottles and fishing debris were common at both pier and soft sediment sites.  Piers had more metal scraps and fishing adjacent items, whereas soft sediment sites had more soft plastic bags and wrappers.
+
+```{r top-items-per-habitat, fig.cap="Table 2: Top ten debris items per habitat"}
+#top items per habitat
+item_total_per_habitat <- site_select %>%
+  group_by(Habitat, ID) %>% #separate the items by habitat type
+  mutate(sum=sum(Total), #sum of total items by type
+         sd=sd(Total)) %>% #sd of total items by type
+        dplyr::select(ID, Habitat, sum, sd)%>% #remove irrelevant columns
+        filter(sum>0) %>% #remove null values
+        arrange(desc(sum)) %>% #show high counts first
+        distinct() %>% #remove duplicate entries
+        ungroup()
+
+#join item names
+item_total_per_habitat <- left_join(item_total_per_habitat, item_code, by="ID") 
+
+top_items_per_pier <- item_total_per_habitat %>% 
+  filter(Habitat=="P") %>%
+  top_n(10, sum) #show top 10 items over all piers
+
+top_items_per_ss <- item_total_per_habitat %>% 
+  filter(Habitat=="SS") %>%
+  top_n(10, sum) #show top 10 items over all sediment sites
+
+#combine the two tables
+top_items_per_habitat <- rbind(top_items_per_pier, top_items_per_ss)
+
+#create kable with both pier and sediment results
+top10items_perHabitat <- top_items_per_habitat %>% 
+  dplyr::select(-Dispersiveness) %>%
+  mutate_if(is.numeric, format, digits=2) %>% #set 2 decimal points
+  kable("html", booktabs = TRUE, #nice format
+      col.names = c("ID", "Habitat", "Sum", "SD", "Name"),
+      caption = "Top 10 items per Habitat Type") %>% 
+      pack_rows(index=c("Pier" = 10, "Sediment"=10)) %>%
+      kable_styling(bootstrap_options="condensed", position="left") 
+
+top10items_perHabitat #display table
+```
+## Mean of items by material type per site and habitat
+Plastic is the most prevalent material type in almost every site, the notable exception being Clifton Gardens soft sediment site where glass was most common.
+```{r material-setup, warning=FALSE, include=FALSE}
+# rename material categories 
+site_total_mat <- site_select
+
+#state variables to rename
+var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+
+#change Material to character
+site_total_mat$Material <- as.character(site_total_mat$Material) 
+
+#set lesser used categories to 'Other'
+site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other" 
+  
+#find the top distribution of material type across all sites
+total_mat <- site_total_mat %>%
+  group_by(Site, Material) %>%  #group by material findings at each site
+  summarise(sum=sum(Total), #total items per each material per site
+            mean=mean(sum)/unique(NumberSurveys), #mean of items by material type per site
+            sd=sd(Total)) %>% 
+            ungroup()
+```
+```{r material-counts, warning=FALSE, fig.cap="Figure 2: Mean items by material type per site and habitat"}
+#create df for labeling habitats
+site_habitat <- site_select %>%
+  dplyr::select(Site, Habitat, Location) %>%
+  distinct() 
+
+#join for labeling
+total_mat <- left_join(total_mat, site_habitat, by="Site") 
+
+LocationLabs <- c(NEUTR = "Neutral Bay", CLIFT = "Clifton Gardens", PARSL = "Parsley Bay", WATSO = "Watsons Bay", DOUBL = "Double Bay")
+HabitatLabs <- c(P = "Pier", SS = "Sediment")
+
+p_total_mat <- total_mat %>%
+  ggplot( aes(x=Habitat, y=mean, fill=Material)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  theme(axis.text.x=element_text(color = "black", size=11, 
+                                 vjust=.8, angle=30, hjust=0.8)) +
+  ylab("Mean item count by material type") + 
+  scale_x_discrete(labels= HabitatLabs) +
+  ggtitle("Mean of items by material per site") +
+  facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scales = "free_y")
+
+p_total_mat
+``` 
+## Mean of fishing vs non-fishing related items per site and habitat
+Sites closer to the harbour mouth demonstrate a higher proportion of fishing related debris.  Fishing related debris was recorded more at pier sites rather than soft sediment sites.
+```{r fishing-setup, warning=FALSE, include=FALSE}
+#Isolate fishing vs non-fishing data
+fishing <- site_select %>%
+  group_by(Site, Fishing) %>% #group by fishing or non-fishing
+  summarise(sum=sum(Total), #total fishing items
+            mean=sum/unique(NumberSurveys),
+            sd=sd(Total)) %>% #total per survey
+  arrange(desc(mean))
+```
+```{r fishing-by-site, warning=FALSE, fig.cap="Figure 3: Fishing related debris"}
+site_habitat <- site_select %>%
+  dplyr::select(Site, Habitat, Location) %>%
+  distinct() #create df for labeling
+
+fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
+
+p_fishing <- fishing %>%
+  ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  facet_wrap(~Location, scales = "free_y")
+
+p_fishing
+```
+# Statistics
+
+## GLMM negative binomial model
+I aggregated debris totals by survey date and location and used a negative binomial GLMM model to fit the data.  Debris totals are predicted by habitat and distance from harbour mouth, both effected by whether debris was fishing related.  Location and Date are random effects.  All p-values are significant with this model fit.
+```{r glm-2, warning=FALSE, message=FALSE}
+#create df to use for models
+mod <- site_select %>%
+  group_by(Date, Location, Habitat, DistKm, NumberSurveys,
+           Fishing) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m2  <- glmmTMB(Total ~ #Debris count
+                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
+                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
+                 (1|Location/Date), #site random effect
+               family=nbinom2(), #negative binomial to deal with count data and zeros
+               data = mod) 
+summary(m2)
+```
+## DHARMa simulation output
+A visual inspection of the QQ plot could not identify deviations from normality.
+```{r simulation-output-m2, fig.cap="Figure 4: DHARMa simulation output of GLMM model"}
+simulationOutput <- simulateResiduals(fittedModel = m2, plot=T)
+```
+## Fourth corner analysis
+Determining the significance of environmental traits and debris attributes.
+```{r gllvm-set-up, warning=FALSE, message=FALSE, results="hide"}
+#Abundance
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+
+#Environment
+  #create survey event and filter zero sum surveys, 
+    env <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>%
+      group_by(survey_event) %>%
+      mutate(sum=sum(Total)) %>%
+      filter(sum>0) %>%
+      dplyr::select(survey_event, Habitat, DistKm) %>%
+      distinct()
+    
+  #convert survey event to rowname
+  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
+  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  #convert Habitat to numeric
+  env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
+  env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
+
+#Traits
+  
+  #load item names
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+
+  #filter out material as some item types may have more than one material type 
+  #(ex. fishing items, furniture)
+  item_code <- item_code %>%
+    dplyr::select(ID, item_name, Fishing, Dispersiveness) 
+  
+  #create column of usable IDs to join
+  IDs <- abund %>%
+    gather(ID, sum) %>%
+    dplyr::select(ID) %>%
+    unique()
+  #create trait df with ID type as row and columns are fishing and dispersiveness
+  TR <- site_select %>%
+    group_by(ID) %>%
+    summarise(sum=sum(Total)) %>%
+    left_join(item_code, by="ID") %>%
+    dplyr::select(ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>%
+    column_to_rownames(var="ID") #create rownames from ID
+
+  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
+  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
+
+y <- as.matrix(abund)
+X <- scale(as.matrix(env))
+TR <- TR
+
+#Data long
+yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
+                colnames(y), v.names = "y", timevar = "sp")
+#id is the site (1:20), sp is the debris ID, y is the count
+TR2 <- data.frame(sp = 1:62, TR)
+datalong <- merge(yX, TR2, by = "sp")
+```
+
+# Fourth corner analysis
+Here we see that nothing is interacting significantly with distance to harbour mouth, however both fishing and unencumbered drift are interacting with habitat significantly.
+```{r 4th-corner-heatmap, fig.cap="Figure 5: Fourth corner heatmap"}
+# Model with environmental and trait variables as predictors
+fit_allfixed <- gllvm(data=datalong, 
+                      formula = y ~ 0 + Habitat + DistKm + 
+                        (Habitat + DistKm) : (Dispersiveness + Fishing), 
+                      family = "negative.binomial")
+
+fourth <- fit_allfixed$fourth.corner
+a <- max( abs(fourth) )
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables", 
+                      ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
+                      at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
+plot.4th
+```
