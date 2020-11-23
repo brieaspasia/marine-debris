@@ -86,14 +86,25 @@ site_select <- site_select %>%
 CSIRO debris classification system was modified to assign a material type and whether fishing or non-fishing related for each debris item.  Dispersiveness was added as a trait using Tangaroa Blue classification system.
 ```{r load-item-code}
 #load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+item_code <- read.csv(file="data/CSIRO-code.csv", 
+                      header=T, sep=",",
+                      fileEncoding="UTF-8-BOM") #removes special characters) 
 
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
 item_code <- item_code %>%
-  dplyr::select(ID, item_name) 
+  dplyr::select(ID, item_name, Fishing, Dispersiveness) 
 
-site_select <- left_join(site_select, item_code, by="ID") 
+site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code")) 
+
+#state variables to rename
+var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+
+#change Material to character
+site_select$Material <- as.character(site_select$Material) 
+
+#set lesser used categories to 'Other'
+site_select$Material[site_select$Material %in% var_change] = "Other" 
 ```
 
 # Site Attributes
@@ -104,7 +115,7 @@ site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEn
 
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis) %>% #select only distance to harbour mouth for join
+  dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
   mutate(DistKm = CostDis/100) #distance to harbour mouth
   
 #join distance to mouth to main dataset
@@ -121,15 +132,14 @@ Debris type is not considered as a random effect because in this instance it is 
 ```{r glm-2, warning=FALSE, message=FALSE}
 #create df to use for models
 mod <- site_select %>%
-  group_by(Date, Location, Habitat, DistKm, NumberSurveys,
-           Fishing) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, Fishing) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m2  <- glmmTMB(Total ~ #Debris count
-                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
-                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
-                 (1|Location/Date), #site random effect
+                 Fishing*Location*Habitat + #predicted by Habitat (fishing or non-fishing)
+                 Fishing*Location*Coast + #predicted by distance from mouth (fishing or non-fishing)
+                 (1|Date), #date random effect
                  # (1|Dispersiveness) + #dispersiveness random effect
                  # ar1(Date + 0 | Location) +
                  # offset(log(NumberSurveys)), #offset by survey count
@@ -138,11 +148,58 @@ m2  <- glmmTMB(Total ~ #Debris count
                data = mod) 
 
 ```
-#Model summary
-P values are all less than 0.05, indicating significance.
-
 ```{r model-summary}
 summary(m2)
+coef(m2)
+```
+```{r glm-disp, warning=FALSE, message=FALSE}
+#create df to use for models
+mod_disp <- site_select %>%
+  group_by(Date, Location, Habitat, Coast, Dispersiveness) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m_disp  <- glmmTMB(Total ~ #Debris count
+                 Dispersiveness*Location*Habitat + #predicted by Habitat (dispersiveness)
+                 Dispersiveness*Location*Coast + #predicted by distance from mouth (dispersiveness)
+                 (1|Date), #site random effect
+                 # (1|Dispersiveness) + #dispersiveness random effect
+                 # ar1(Date + 0 | Location) +
+                 # offset(log(NumberSurveys)), #offset by survey count
+               # zi = ~1, #zero inflation
+               family=nbinom2(), #negative binomial to deal with count data and zeros
+               data = mod_disp) 
+
+```
+```{r model-summary-dispersion}
+summary(m_disp)
+coef(m_disp)
+```
+```{r glm-F2, warning=FALSE, message=FALSE}
+#create df to use for models
+mod_F2 <- site_select %>%
+  filter(ID=="F2") %>%
+  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m_F2  <- glmmTMB(Total ~ #Debris count
+                 Location*Habitat + #predicted by Habitat (dispersiveness)
+                 Location*Coast + #predicted by distance from mouth (dispersiveness)
+                 (1|Date), #site random effect
+                 # (1|Dispersiveness) + #dispersiveness random effect
+                 # ar1(Date + 0 | Location) +
+                 # offset(log(NumberSurveys)), #offset by survey count
+               # zi = ~1, #zero inflation
+               family=nbinom2(), #negative binomial to deal with count data and zeros
+               data = mod_F2) 
+
+```
+
+
+```{r model-summary-F2}
+summary(m_F2)
+coef(m_F2)
 ```
 
 # Regression coefficients
@@ -150,9 +207,7 @@ This is the mean change in the dependent (total debris) variable for each 1 unit
 
 #I'm not sure how to explain the coefficients on the fishing effect?  And is the intercept the pier sites?  I still get so confused about the intercept and how the model chooses it alphabetically...
 
-```{r coefficients}
-coef(m2)
-```
+
 # Testing temporal autocorrelation
 Despite repeat surveys at each site, temporal autocorrelation testing shows that the effect of repeat surveys is not significant.  This is likely due to the fact that the initial surveys did not actually function as baseline cleans because the sites took many trips to clean and pier sites were never cleared completely.
 ```{r testing-temporal-autocorrelation, warning=FALSE, message=FALSE, results="hide"}
@@ -206,7 +261,7 @@ mod$resid = resid(m2) #create a column for each survey event's residuals
 # DHARMa Simulation Output
 
 ```{r simulation-output-m2}
-simulationOutput <- simulateResiduals(fittedModel = m2, plot=T)
+simulationOutput <- simulateResiduals(fittedModel = m_F2, plot=T)
   
 plotResiduals(simulationOutput)
 
@@ -319,7 +374,6 @@ fit_allfixed <- gllvm(data=datalong,
                         (Habitat + DistKm) : (Dispersiveness + Fishing), 
                       family = "negative.binomial")
 coefplot(fit_allfixed)
-# plot(fit_allfixed)
 ```
 # Fourth corner heatmap
 Here we see that nothing is significantly interacting with distance, however both fishing and unencumbered drift are interacting with habitat significantly.
@@ -335,29 +389,26 @@ plot.4th
 ```
 
 
-```{r AR1-setup-vignette-example, include=FALSE, results="hide"}
-## Number of time points
-n <- 6  
+```{r glm-material, warning=FALSE, message=FALSE}
 
-## Simulate the process using the MASS
-x <- mvrnorm(mu = rep(0,n),
-             Sigma = .7 ^ as.matrix(dist(1:n)) )
+#create df to use for models
+mod <- mat_select %>%
+  dplyr::filter(Material=="Glass") %>%
+  group_by(Date, Location, Habitat, DistKm, NumberSurveys,
+           Fishing) %>% #relevant variables
+  summarise(Total=sum(Total)) 
 
-## Add measurement noise
-y <- x + rnorm(n)    
+#GLM negative binomial with two variables
+m_glass  <- glmmTMB(Total ~ #Debris count
+                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
+                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
+                 (1|Location/Date), #site random effect
+                 # (1|Dispersiveness) + #dispersiveness random effect
+                 # ar1(Date + 0 | Location) +
+                 # offset(log(NumberSurveys)), #offset by survey count
+               # zi = ~1, #zero inflation
+               family=nbinom2(), #negative binomial to deal with count data and zeros
+               data = mod) 
 
-#Specify time variable as a factor
-times <- factor(1:n, levels=1:n)
-levels(times)
-
-#Assign a grouping variable
-group <- factor(rep(1,n))
-
-#combine data into a single df
-dat0 <- data.frame(y,times,group)
-
-#fit the model
-glmmTMB(y ~ ar1(times + 0 | group), data=dat0) #is group the site?  times would be the date?
 ```
-
 

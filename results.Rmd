@@ -93,7 +93,7 @@ item_code <- read.csv(file="data/CSIRO-code.csv",
 item_code <- item_code %>%
   dplyr::select(ID, item_name, Dispersiveness) 
 
-site_select <- left_join(site_select, item_code, by="ID") 
+site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code")) 
 ```
 
 # Site attributes
