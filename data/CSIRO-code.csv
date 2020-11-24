@@ -1,14 +1,14 @@
-ID,item_name,Material,SubMaterial,Fishing,Dispersiveness
+﻿ID,item_name,Material,SubMaterial,Fishing,Dispersiveness
 H1,Pipe/PVC,Plastic,Hard Plastic,Non-fishing,Encumbered drift
 H2,Beverage bottle <1 L,Plastic,Hard Plastic,Non-fishing,Very mobile
 H3,Other bottle,Plastic,Hard Plastic,Non-fishing,Very mobile
-H4,Bottle cap/lid,Plastic,Hard Plastic,Non-fishing,Unencumbered drift
+H4,Bottle cap/lid,Plastic,Hard Plastic,Non-fishing,Encumbered drift
 H5,Food container,Plastic,Hard Plastic,Non-fishing,Encumbered drift
 H6,Utensil/plate/bowl,Plastic,Hard Plastic,Non-fishing,Very mobile
 H7,Bucket/crate,Plastic,Hard Plastic,Non-fishing,Very mobile
 H8,Lighter,Plastic,Hard Plastic,Non-fishing,Very mobile
 H9,Lollipop stick/earbud,Plastic,Hard Plastic,Non-fishing,Very mobile
-H10,Unknown/other hard,Plastic,Hard Plastic,Non-fishing,Unencumbered drift
+H10,Unknown/other hard,Plastic,Hard Plastic,Non-fishing,Encumbered drift
 S1,Thin film carry bag,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 S2,Food wrapper/label,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 S3,Sheeting,Plastic,Soft Plastic,Non-fishing,Encumbered drift
@@ -33,20 +33,20 @@ M10,Unknown/other hard,Metal,,Non-fishing,Limited dispersion
 M11,Unknown/other soft,Metal,,Non-fishing,Limited dispersion
 G1,Beverage bottle,Glass,,Non-fishing,Limited dispersion
 G2,Jar,Glass,,Non-fishing,Limited dispersion
-G3,Light globe/tube,Glass,,Non-fishing,Unencumbered drift
+G3,Light globe/tube,Glass,,Non-fishing,Encumbered drift
 G4,Unknown/other glass,Glass,,Non-fishing,Limited dispersion
-R1,Thong/shoe,Rubber,,Non-fishing,Unencumbered drift
+R1,Thong/shoe,Rubber,,Non-fishing,Encumbered drift
 R2,Tyre,Rubber,,Non-fishing,Limited dispersion
 R3,Balloon,Rubber,,Non-fishing,Very mobile
-R4,Rubber band,Rubber,,Non-fishing,Unencumbered drift
+R4,Rubber band,Rubber,,Non-fishing,Encumbered drift
 R5,Unknown/other,Rubber,,Non-fishing,Limited dispersion
 C1,String/rope/strap,Cloth,,Non-fishing,Encumbered drift
 C2,Clothing/towel,Cloth,,Non-fishing,Encumbered drift
-C3,Wipes/cloths,Cloth,,Non-fishing,Unencumbered drift
+C3,Wipes/cloths,Cloth,,Non-fishing,Encumbered drift
 C4,Insulation/stuffing,Cloth,,Non-fishing,Very mobile
-C5,Unknown/other,Cloth,,Non-fishing,Unencumbered drift
+C5,Unknown/other,Cloth,,Non-fishing,Encumbered drift
 T1,Wood/timber,Timber,,Non-fishing,Encumbered drift
-T2,Utensil/food stick,Timber,,Non-fishing,Unencumbered drift
+T2,Utensil/food stick,Timber,,Non-fishing,Encumbered drift
 T3,Bottle cork,Timber,,Non-fishing,Very mobile
 T4,Pallet,Timber,,Non-fishing,Limited dispersion
 T5,Unknown/other,Timber,,Non-fishing,Encumbered drift
@@ -69,7 +69,7 @@ F1,Net,Plastic,,Fishing,Limited dispersion
 F2,Fishing line,Plastic,,Fishing,Limited dispersion
 F3,Fishing lures,Plastic,,Fishing,Limited dispersion
 F4,buoys/floats,Plastic,,Fishing,Very mobile
-F5,Glow stick,Plastic,,Fishing,Unencumbered drift
+F5,Glow stick,Plastic,,Fishing,Encumbered drift
 F6,Fishhook/sinker,Metal,,Fishing,Limited dispersion
 F7,Unknown/other,Undetermined,,Fishing,Limited dispersion
 Z1,Battery,E-Waste,,Non-fishing,Limited dispersion
