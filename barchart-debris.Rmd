@@ -79,7 +79,7 @@ site_select %>%
 
 ```{r load-item-code}
 #load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",") 
+item_code <- read.csv(file="data/CSIRO-code.csv", header=T, sep=",", fileEncoding="UTF-8-BOM") 
 
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
@@ -186,7 +186,42 @@ p_total_mat
 
 ggsave(filename = "figures/total_mat.png", plot = p_total_mat, dpi = 600)
 ``` 
-        
+```{r pier-vs-ss-items}
+#isolate Pier sites
+here::here()
+total_hab <- site_select
+
+Location = unique(total_hab$Location) %>% as.character()
+      
+for(x in Location){
+  
+#2.1 Define temp Location
+  total_hab <- total_hab %>% filter(Location==x) %>%
+  group_by(Habitat) %>% #group by site
+  summarise(sum=sum(Total), #total items per site
+            mean=mean(sum)/unique(NumberSurveys), #mean of items by hab
+            sd=sd(Total)) %>% 
+            ungroup()
+
+#2.11 Material by land use
+p_hab <- ggplot(total_hab, aes(x = Habitat, y = mean, fill = Habitat)) +
+         geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+         geom_text(aes(label = mean), vjust = -0.5, color = "black", size = 2) +
+         theme(axis.text.x=element_text(color = "black", vjust=.8,
+                                 angle=30, hjust=0.8)) +
+         ggtitle("Mean debris count by habitat", subtitle = x) +
+         labs(y="Mean debris count per habitat", x="Habitat")
+
+ ggsave(filename = paste0(here::here("Output"),"/",x,"_hab_mean.jpg"),
+        plot = p_hab, dpi = 600)
+
+dev.off()
+
+}
+
+```
+ 
 ```{r pier-items}
 #isolate Pier sites
 total_P <- total_mat %>%
@@ -198,7 +233,7 @@ p_total_P <- total_P %>%
   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
   theme(axis.text.x=element_text(color = "black", vjust=.8,
                                  angle=30, hjust=0.8)) +
-  ylab("Mean item count by material type") + 
+  ylab("Mean item count by material type") +
   ggtitle("Mean of items by material at pier sites") +
   facet_wrap(~Location, labeller=labeller(Location=LocationLabs), scales = "free_y")
 

@@ -93,7 +93,10 @@ item_code <- read.csv(file="data/CSIRO-code.csv",
 item_code <- item_code %>%
   dplyr::select(ID, item_name, Dispersiveness) 
 
-site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code")) 
+site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
+
+site_select <- site_select %>%
+  mutate(item = paste(Material, item_name,sep=": "))
 ```
 
 # Site attributes
@@ -104,7 +107,7 @@ site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEn
 
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis) %>% #select only distance to harbour mouth for join
+  dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
   mutate(DistKm = CostDis/100) #distance to harbour mouth
   
 #join distance to mouth to main dataset
@@ -118,35 +121,70 @@ Here we see the proportion of debris items recovered under piers in blue, and th
 ```{r results-map, fig.cap="Fig 1: Mean debris count and proportion per habitat", out.width = '100%'}
 knitr::include_graphics("images/results-map.png")
 ```
-## Top twenty items
+```{r pier-vs-ss-items}
+#isolate Pier sites
+here::here()
+total_hab <- site_select
+
+Location = unique(total_hab$Location) %>% as.character()
+      
+for(x in Location){
+  
+#2.1 Define temp Location
+  total_hab <- total_hab %>% filter(Location==x) %>%
+  group_by(Habitat) %>% #group by site
+  summarise(sum=sum(Total), #total items per site
+            mean=mean(sum)/unique(NumberSurveys), #mean of items by hab
+            sd=sd(Total)) %>% 
+            ungroup()
+
+#2.11 Material by land use
+p_hab <- ggplot(total_hab, aes(x = Habitat, y = mean, fill = Habitat)) +
+         geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+         geom_text(aes(label = mean), vjust = -0.5, color = "black", size = 2) +
+         theme(axis.text.x=element_text(color = "black", vjust=.8,
+                                 angle=30, hjust=0.8)) +
+         ggtitle("Mean debris count by habitat", subtitle = x) +
+         labs(y="Mean debris count per habitat", x="Habitat")
+
+ ggsave(filename = paste0(here::here("Output"),"/",x,"_hab_mean.jpg"),
+        plot = p_hab, dpi = 600)
+
+dev.off()
+
+}
+
+```
+
+## Top ten items
 The most common item across all surveys was fishing line, at nearly 60% of the total debris recorded.  All other item types accounted for less than 10% of items total, with glass bottles, fishhooks/sinkers, and metal scraps (some fishing related) rounding out the top five.
-```{r top-items, fig.cap="Table 1: Top twenty debris types across all surveys"}
+```{r top-items, fig.cap="Table 1: Top ten debris types across all surveys"}
 #Find the top item types across all surveys
 total_item <- site_select %>%
-  group_by(Material, ID) %>%
+  group_by(item) %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
-        dplyr::select(ID, Material, sum, sd) %>% #remove irrelevant columns
+        dplyr::select(item, sum, sd) %>% #remove irrelevant columns
         filter(sum>0) %>% #remove zero values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
         ungroup()
 
-total_item <- left_join(total_item, item_code, by="ID") #join item names
+# total_item <- left_join(total_item, item_code, by="ID") #join item names
 
-top_items <- total_item %>% top_n(20, sum) #show top 20 items total
+top_items <- total_item %>% top_n(10, sum) #show top 20 items total
 
 top_items <- top_items %>%
            mutate(pct=sum/sum(sum)*100)
 
-top20items <- top_items %>%
-  dplyr::select(-Dispersiveness) %>%
-  mutate_if(is.numeric, format, digits=2) %>%
+top10items <- top_items %>%
+  mutate_if(is.numeric, format, digits=0) %>%
   kable("html", 
-      col.names = c("ID", "Material", "Sum", "SD", "Name", "Percent"),
-      caption = "Top 20 items across all surveys") %>% 
+      col.names = c("Debris Item", "Sum", "SD", "Percent"),
+      caption = "Top 10 items across all surveys") %>% 
   kable_styling(bootstrap_options="condensed", position="left")
-top20items #print table
+top10items #print table
 ``` 
 ## Top items per habitat type
 Glass bottles and fishing debris were common at both pier and soft sediment sites.  Piers had more metal scraps and fishing adjacent items, whereas soft sediment sites had more soft plastic bags and wrappers.
@@ -154,40 +192,43 @@ Glass bottles and fishing debris were common at both pier and soft sediment site
 ```{r top-items-per-habitat, fig.cap="Table 2: Top ten debris items per habitat"}
 #top items per habitat
 item_total_per_habitat <- site_select %>%
-  group_by(Habitat, ID) %>% #separate the items by habitat type
+  group_by(Habitat, item) %>% #separate the items by habitat type
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
-        dplyr::select(ID, Habitat, sum, sd)%>% #remove irrelevant columns
+        dplyr::select(item, Habitat, sum, sd)%>% #remove irrelevant columns
         filter(sum>0) %>% #remove null values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
         ungroup()
 
 #join item names
-item_total_per_habitat <- left_join(item_total_per_habitat, item_code, by="ID") 
+# item_total_per_habitat <- left_join(item_total_per_habitat, item_code, by="ID") 
 
 top_items_per_pier <- item_total_per_habitat %>% 
   filter(Habitat=="P") %>%
-  top_n(10, sum) #show top 10 items over all piers
+  top_n(6, sum) #show top 10 items over all piers
 
 top_items_per_ss <- item_total_per_habitat %>% 
   filter(Habitat=="SS") %>%
-  top_n(10, sum) #show top 10 items over all sediment sites
+  top_n(6, sum) #show top 10 items over all sediment sites
 
 #combine the two tables
 top_items_per_habitat <- rbind(top_items_per_pier, top_items_per_ss)
 
+#Create pct of total
+top_items_per_habitat <- top_items_per_habitat %>%
+           mutate(pct=sum/sum(sum)*100)
+
 #create kable with both pier and sediment results
-top10items_perHabitat <- top_items_per_habitat %>% 
-  dplyr::select(-Dispersiveness) %>%
-  mutate_if(is.numeric, format, digits=2) %>% #set 2 decimal points
+top6items_perHabitat <- top_items_per_habitat %>% 
+  mutate_if(is.numeric, format, digits=0) %>% #set no decimals
   kable("html", booktabs = TRUE, #nice format
-      col.names = c("ID", "Habitat", "Sum", "SD", "Name"),
-      caption = "Top 10 items per Habitat Type") %>% 
-      pack_rows(index=c("Pier" = 10, "Sediment"=10)) %>%
+      col.names = c("item", "Habitat", "Sum", "SD", "Percent"),
+      caption = "Top 6 items per Habitat Type") %>% 
+      pack_rows(index=c("Pier" = 6, "Sediment"=6)) %>%
       kable_styling(bootstrap_options="condensed", position="left") 
 
-top10items_perHabitat #display table
+top6items_perHabitat #display table
 ```
 ## Mean of items by material type per site and habitat
 Plastic is the most prevalent material type in almost every site, the notable exception being Clifton Gardens soft sediment site where glass was most common.
@@ -319,7 +360,7 @@ Determining the significance of environmental traits and debris attributes.
       group_by(survey_event) %>%
       mutate(sum=sum(Total)) %>%
       filter(sum>0) %>%
-      dplyr::select(survey_event, Habitat, DistKm) %>%
+      dplyr::select(survey_event, Habitat, DistKm, Coast) %>%
       distinct()
     
   #convert survey event to rowname
@@ -328,6 +369,10 @@ Determining the significance of environmental traits and debris attributes.
   #convert Habitat to numeric
   env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
   env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
+  
+  #convert Coast to numeric
+  env$Coast <- as.factor(env$Coast) #convert character to factor with 2 levels
+  env$Coast <- as.numeric(env$Coast) #convert factor to numeric
 
 #Traits
   
@@ -378,6 +423,13 @@ fit_allfixed <- gllvm(data=datalong,
                       formula = y ~ 0 + Habitat + DistKm + 
                         (Habitat + DistKm) : (Dispersiveness + Fishing), 
                       family = "negative.binomial")
+
+fit_4th <- gllvm(y, X, TR, family = "negative.binomial", num.lv = 2, 
+                 formula = y ~ (Habitat + DistKm + Coast) +
+                (Habitat + DistKm + Coast) : (Dispersiveness + 
+                Fishing), seed = 123,
+                row.eff = "random", n.init = 3, jitter.var = 0.01,
+                randomX = ~ Habitat + DistKm + Coast)
 
 fourth <- fit_allfixed$fourth.corner
 a <- max( abs(fourth) )
