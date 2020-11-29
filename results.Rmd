@@ -154,7 +154,6 @@ p_hab <- ggplot(total_hab, aes(x = Habitat, y = mean, fill = Habitat)) +
 dev.off()
 
 }
-
 ```
 
 ## Top ten items
@@ -221,9 +220,10 @@ top_items_per_habitat <- top_items_per_habitat %>%
 
 #create kable with both pier and sediment results
 top6items_perHabitat <- top_items_per_habitat %>% 
+  dplyr::select(-Habitat) %>%
   mutate_if(is.numeric, format, digits=0) %>% #set no decimals
   kable("html", booktabs = TRUE, #nice format
-      col.names = c("item", "Habitat", "Sum", "SD", "Percent"),
+      col.names = c("item", "Sum", "SD", "Percent"),
       caption = "Top 6 items per Habitat Type") %>% 
       pack_rows(index=c("Pier" = 6, "Sediment"=6)) %>%
       kable_styling(bootstrap_options="condensed", position="left") 
@@ -369,22 +369,11 @@ Determining the significance of environmental traits and debris attributes.
   #convert Habitat to numeric
   env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
   env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
-  
   #convert Coast to numeric
   env$Coast <- as.factor(env$Coast) #convert character to factor with 2 levels
   env$Coast <- as.numeric(env$Coast) #convert factor to numeric
 
 #Traits
-  
-  #load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", 
-                      header=T, sep=",",
-                      fileEncoding="UTF-8-BOM") #removes special characters
-
-  #filter out material as some item types may have more than one material type 
-  #(ex. fishing items, furniture)
-  item_code <- item_code %>%
-    dplyr::select(ID, item_name, Fishing, Dispersiveness) 
   
   #create column of usable IDs to join
   IDs <- abund %>%
@@ -396,12 +385,22 @@ item_code <- read.csv(file="data/CSIRO-code.csv",
     group_by(ID) %>%
     summarise(sum=sum(Total)) %>%
     left_join(item_code, by="ID") %>%
-    dplyr::select(ID, Dispersiveness, Fishing) %>%
-    inner_join(IDs, by="ID") %>%
+    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>% #remove items with 0 count
     column_to_rownames(var="ID") #create rownames from ID
+  
+  #state variables to rename
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+  
+  #change Material to character
+  TR$Material <- as.character(TR$Material) 
+  
+  #set lesser used categories to 'Other'
+  TR$Material[TR$Material %in% var_change] = "Other" 
 
   TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
   TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
+  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
 
 y <- as.matrix(abund)
 X <- scale(as.matrix(env))
@@ -420,8 +419,8 @@ Here we see that nothing is interacting significantly with distance to harbour m
 ```{r 4th-corner-heatmap, fig.cap="Figure 5: Fourth corner heatmap"}
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
-                      formula = y ~ 0 + Habitat + DistKm + 
-                        (Habitat + DistKm) : (Dispersiveness + Fishing), 
+                      formula = y ~ (0 + Habitat + DistKm + Coast) + 
+                        (Habitat + DistKm + Coast) : (Dispersiveness + Fishing + Material), 
                       family = "negative.binomial")
 
 fit_4th <- gllvm(y, X, TR, family = "negative.binomial", num.lv = 2, 
