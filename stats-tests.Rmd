@@ -128,7 +128,54 @@ Regression isolates the relationship between each independent variable (Habitat 
 
 Debris type is not considered as a random effect because in this instance it is the total debris count that matters rather than the individual debris types.  Accumulation due to repeat surveys is also not considered as the temporal autocorrelation does not indicate that repeat surveys are significant (see below).
 
+# How does the amount of debris differ between pier and soft sediment sites?
+```{r glm-hab, warning=FALSE, message=FALSE}
+#create df to use for models
+mod_hab <- site_select %>%
+  group_by(Date, Location, Habitat, Coast, DistKm, Fishing) %>% #relevant variables
+  summarise(Total=sum(Total)) 
 
+#GLM negative binomial with two variables and zero inflation
+m_hab  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat (fishing or non-fishing)
+                 Coast + #predicted by aspect (fishing or non-fishing)
+                 (1|Location/Date), #date random effect
+                 # (1|Dispersiveness) + #dispersiveness random effect
+                 # ar1(Date + 0 | Location) +
+                 # offset(log(NumberSurveys)), #offset by survey count
+               # zi = ~1, #zero inflation
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_hab) 
+
+```
+# Summary
+  ## AIC estimates out of sample prediction error and thereby relative quality of model
+  ## BIC (Bayesian information criterion) is a criterion for model selection among a finite set of models; the model with the lowest BIC is preferred.
+  ## logLik is a function of sample size, can be used to compare the fit of different coefficients.  Larger number is better.
+  ## Deviance is a measure of error.  lower deviance means better fit to data. The greater the deviance, the worse the model fits compared to the best case (saturated).
+  ## df.resid is the sample size minus the number of parameters being measured.
+```{r model-summary-hab}
+summary(m_hab)
+coef(m_hab)
+```
+
+```{r simulation-output-hab}
+simulationOutput_hab <- simulateResiduals(fittedModel = m_hab, plot=T)
+  
+plotResiduals(simulationOutput_hab)
+
+# testUniformity(simulationOutput_hab) #tests if the overall distribution conforms to expectations
+# testOutliers(simulationOutput_hab) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput_hab) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput_hab) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+# testZeroInflation(simulationOutput_fish) #tests if there are more zeros than expected
+
+# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
+# means <- function(x) mean(x) # testing if mean prediction fits
+# testGeneric(simulationOutput_hab, summary = means) #test if a generic summary statistics deviates from model expectations
+
+plotQQunif(m_hab, testDispersion=FALSE)
+```
 ```{r glm-fish, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_fish <- site_select %>%
