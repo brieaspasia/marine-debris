@@ -124,15 +124,15 @@ site_select <- left_join(site_select, site_attr, by="Site")
 ```
 
 # GLMM model
-Regression isolates the relationship between each independent variable (Habitat and distance) and the dependent variable (Total debris). Total debris count predicted by habitat (pier or sediment) and distance from harbour mouth, both affected by fishing and with location as a random effect.  Offset by the number of surveys at each site to account for differing counts.  Using negative binomial because it is count data with a high number of zeros, and an additional zero inflation because of the zeros.
+Regression isolates the relationship between each independent variable (Habitat and distance) and the dependent variable (Total debris). Total debris count predicted by habitat (pier or sediment) and coast (north or south), with date nested in location as a random effect.  Using negative binomial because it is count data with a high number of zeros.
 
 Debris type is not considered as a random effect because in this instance it is the total debris count that matters rather than the individual debris types.  Accumulation due to repeat surveys is also not considered as the temporal autocorrelation does not indicate that repeat surveys are significant (see below).
 
-# How does the amount of debris differ between pier and soft sediment sites?
+# Q1: How does the amount of debris differ between pier and soft sediment sites?
 ```{r glm-hab, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_hab <- site_select %>%
-  group_by(Date, Location, Habitat, Coast, DistKm, Fishing) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
@@ -148,7 +148,7 @@ m_hab  <- glmmTMB(Total ~ #Debris count
                data = mod_hab) 
 
 ```
-# Summary
+# Summary - these concepts are important as comparisons between different model fits, but the numbers themselves aren't necessarily important.
   ## AIC estimates out of sample prediction error and thereby relative quality of model
   ## BIC (Bayesian information criterion) is a criterion for model selection among a finite set of models; the model with the lowest BIC is preferred.
   ## logLik is a function of sample size, can be used to compare the fit of different coefficients.  Larger number is better.
@@ -158,104 +158,98 @@ m_hab  <- glmmTMB(Total ~ #Debris count
 summary(m_hab)
 coef(m_hab)
 ```
+# Glossary
+  ## QQ Plot - compares a sample with a theoretical sample that comes from a certain distribution (normal distribution)
+  ## Residuals - difference between the actual observed response values and the response values that the model predicted.
+  ## Estimate - same as residuals?  coefficients?
+  ## Standard Error - measure the amount that the coefficient estimates vary from the actual average value of the response variable. Ideally this will be a lower number relative to the coefficients. 
+  ## P-value - probability of obtaining results as extreme as the observed results of a statistical hypothesis test, assuming that the null hypothesis is correct and there is no relationship between the variables. <5% means that there is a relationship.
 
 ```{r simulation-output-hab}
 simulationOutput_hab <- simulateResiduals(fittedModel = m_hab, plot=T)
   
 plotResiduals(simulationOutput_hab)
 
-# testUniformity(simulationOutput_hab) #tests if the overall distribution conforms to expectations
+testUniformity(simulationOutput_hab) #tests if the overall distribution conforms to expectations
 # testOutliers(simulationOutput_hab) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput_hab) #tests if the simulated dispersion is equal to the observed dispersion
 testQuantiles(simulationOutput_hab) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput_fish) #tests if there are more zeros than expected
-
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput_hab, summary = means) #test if a generic summary statistics deviates from model expectations
+testZeroInflation(simulationOutput_hab) #tests if there are more zeros than expected
 
 plotQQunif(m_hab, testDispersion=FALSE)
 ```
+# Q2 Does fishing or non-fishing debris type impact distribution?
+  ## Testing fishing related debris
 ```{r glm-fish, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_fish <- site_select %>%
-  group_by(Date, Location, Habitat, Coast, Fishing) %>% #relevant variables
+  filter(Fishing=="Fishing") %>% #fishing line
+  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_fish  <- glmmTMB(Total ~ #Debris count
-                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
-                 Fishing*Coast + #predicted by aspect (fishing or non-fishing)
-                 (1|Location/Date), #date random effect
-                 # (1|Dispersiveness) + #dispersiveness random effect
-                 # ar1(Date + 0 | Location) +
-                 # offset(log(NumberSurveys)), #offset by survey count
-               # zi = ~1, #zero inflation
-               family=nbinom2(), #negative binomial to deal with count data and zeros
+                 Habitat + #predicted by Habitat 
+                 Coast + #predicted by distance from mouth 
+                 (1|Location/Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_fish) 
 
 ```
-```{r model-summary}
+
+```{r model-summary-fish}
 summary(m_fish)
 coef(m_fish)
 ```
 
-```{r simulation-output-m2}
+```{r simulation-output-fish}
 simulationOutput_fish <- simulateResiduals(fittedModel = m_fish, plot=T)
   
 plotResiduals(simulationOutput_fish)
 
-# testUniformity(simulationOutput_fish) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput_fish) #tests if there are more simulation outliers than expected
+testUniformity(simulationOutput_fish) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_fish) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput_fish) #tests if the simulated dispersion is equal to the observed dispersion
 testQuantiles(simulationOutput_fish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput_fish) #tests if there are more zeros than expected
-
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput_fish, summary = means) #test if a generic summary statistics deviates from model expectations
-
-plotQQunif(m_fish, testDispersion=FALSE)
+testZeroInflation(simulationOutput_fish) #tests if there are more zeros than expected
 ```
-```{r glm-disp, warning=FALSE, message=FALSE}
+  ## Testing non-fishing related debris
+```{r glm-nonfish, warning=FALSE, message=FALSE}
 #create df to use for models
-mod_disp <- site_select %>%
-  group_by(Date, Location, Habitat, Coast, Dispersiveness) %>% #relevant variables
+mod_nonfish <- site_select %>%
+  filter(Fishing=="Non-Fishing") %>% #fishing line
+  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
-m_disp  <- glmmTMB(Total ~ #Debris count
-                 Dispersiveness*Habitat + #predicted by Habitat (dispersiveness)
-                 Dispersiveness*Coast + #predicted by aspect (dispersiveness)
-                 (1|Location/Date), #site/date random effect
-               family=nbinom2(), #negative binomial to deal with count data and zeros
-               data = mod_disp) 
+m_nonfish  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat 
+                 Coast + #predicted by distance from mouth 
+                 (1|Location/Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_nonfish) 
 
 ```
-```{r model-summary-dispersion}
-summary(m_disp)
-coef(m_disp)
+
+```{r model-summary-nonfish}
+summary(m_nonfish)
+coef(m_nonfish)
 ```
 
-```{r simulation-output-m_disp}
-simulationOutput_disp <- simulateResiduals(fittedModel = m_disp, plot=T)
+```{r simulation-output-nonfish}
+simulationOutput_nonfish <- simulateResiduals(fittedModel = m_nonfish, plot=T)
   
-plotResiduals(simulationOutput_disp)
+plotResiduals(simulationOutput_nonfish)
 
-# testUniformity(simulationOutput_disp) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput_disp) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_disp) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_disp) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput_disp) #tests if there are more zeros than expected
-
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput_disp, summary = means) #test if a generic summary statistics deviates from model expectations
-
-plotQQunif(m_disp, testDispersion=FALSE)
+testUniformity(simulationOutput_nonfish) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_nonfish) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput_nonfish) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput_nonfish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(simulationOutput_nonfish) #tests if there are more zeros than expected
 ```
+
 ```{r glm-F2, warning=FALSE, message=FALSE}
-#create df to use for models
+#create df of fishing line to use for models
 mod_F2 <- site_select %>%
   filter(ID=="F2") %>% #fishing line
   group_by(Date, Location, Habitat, Coast) %>% #relevant variables
@@ -263,14 +257,13 @@ mod_F2 <- site_select %>%
 
 #GLM negative binomial with two variables and zero inflation
 m_F2  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat (dispersiveness)
-                 Coast + #predicted by distance from mouth (dispersiveness)
+                 Habitat + #predicted by Habitat 
+                 Coast + #predicted by distance from mouth 
                  (1|Location/Date), #site random effect
-               family=nbinom2(), #negative binomial to deal with count data and zeros
+               family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_F2) 
 
 ```
-
 
 ```{r model-summary-F2}
 summary(m_F2)
@@ -278,24 +271,20 @@ coef(m_F2)
 ```
 
 ```{r simulation-output-m_F2}
+#simulation output for fishing line counts
 simulationOutput_F2 <- simulateResiduals(fittedModel = m_F2, plot=T)
   
 plotResiduals(simulationOutput_F2)
 
-# testUniformity(simulationOutput_F2) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput_F2) #tests if there are more simulation outliers than expected
+testUniformity(simulationOutput_F2) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_F2) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput_F2) #tests if the simulated dispersion is equal to the observed dispersion
 testQuantiles(simulationOutput_F2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput_F2) #tests if there are more zeros than expected
-
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput_F2, summary = means) #test if a generic summary statistics deviates from model expectations
-
-plotQQunif(m_F2, testDispersion=FALSE)
+testZeroInflation(simulationOutput_F2) #tests if there are more zeros than expected
 ```
+
 ```{r glm-btl, warning=FALSE, message=FALSE}
-#create df to use for models
+#create df of glass bottles to use for models
 mod_btl <- site_select %>%
   filter(ID=="G1") %>% #glass bottles
   group_by(Date, Location, Habitat, Coast) %>% #relevant variables
@@ -306,37 +295,32 @@ m_btl  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat 
                  Coast + #predicted by aspect
                  (1|Location/Date), #site/date random effect
-               family=nbinom2(), #negative binomial to deal with count data and zeros
+               family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_btl) 
 
 ```
 
 
-```{r model-summary-F2}
+```{r model-summary-btl}
 summary(m_btl)
 coef(m_btl)
 ```
 
 ```{r simulation-output-m_btl}
+#simulation output for glass bottle counts
 simulationOutput_btl <- simulateResiduals(fittedModel = m_btl, plot=T)
   
 plotResiduals(simulationOutput_btl)
 
-# testUniformity(simulationOutput_btl) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput_btl) #tests if there are more simulation outliers than expected
+testUniformity(simulationOutput_btl) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_btl) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput_btl) #tests if the simulated dispersion is equal to the observed dispersion
 testQuantiles(simulationOutput_btl) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput_btl) #tests if there are more zeros than expected
-
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput_btl, summary = means) #test if a generic summary statistics deviates from model expectations
-
-plotQQunif(m_btl, testDispersion=FALSE)
+testZeroInflation(simulationOutput_btl) #tests if there are more zeros than expected
 ```
 
 ```{r glm-hook, warning=FALSE, message=FALSE}
-#create df to use for models
+#create df of fishing hooks/sinkers to use for models
 mod_hook <- site_select %>%
   filter(ID=="F6") %>% #fishhooks and sinkers
   group_by(Date, Location, Habitat, Coast) %>% #relevant variables
@@ -359,36 +343,29 @@ coef(m_hook)
 ```
 
 ```{r simulation-output-m_hook}
+#simulation output for hook/sinker counts
 simulationOutput_hook <- simulateResiduals(fittedModel = m_hook, plot=T)
   
 plotResiduals(simulationOutput_hook)
 
-# testUniformity(simulationOutput_hook) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput_hook) #tests if there are more simulation outliers than expected
+testUniformity(simulationOutput_hook) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_hook) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput_hook) #tests if the simulated dispersion is equal to the observed dispersion
 testQuantiles(simulationOutput_hook) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-# testZeroInflation(simulationOutput_hook) #tests if there are more zeros than expected
-
-# #need to set a function for the summary in order to test particular scenarios - still not sure about this one...
-# means <- function(x) mean(x) # testing if mean prediction fits
-# testGeneric(simulationOutput_hook, summary = means) #test if a generic summary statistics deviates from model expectations
-
-plotQQunif(m_hook, testDispersion=FALSE)
+testZeroInflation(simulationOutput_hook) #tests if there are more zeros than expected
 ```
 # Regression coefficients
 This is the mean change in the dependent (total debris) variable for each 1 unit change in an independent (habitat and distance) variable.  For instance, each km more from the harbour results in -0.327 less debris items.  Soft sediment sites are likely to have -3.556 less count per item than pier sites.
-
-#I'm not sure how to explain the coefficients on the fishing effect?  And is the intercept the pier sites?  I still get so confused about the intercept and how the model chooses it alphabetically...
 
 
 # Testing temporal autocorrelation
 Despite repeat surveys at each site, temporal autocorrelation testing shows that the effect of repeat surveys is not significant.  This is likely due to the fact that the initial surveys did not actually function as baseline cleans because the sites took many trips to clean and pier sites were never cleared completely.
 ```{r testing-temporal-autocorrelation, warning=FALSE, message=FALSE, results="hide"}
 #creating a column from the model residuals
-mod_F2$resid = resid(m_F2) #create a column for each survey event's residuals
+mod_hab$resid = resid(m_hab) #create a column for each survey event's residuals
 
 #Clifton Gardens - DW = 3.301, p-value = 0.05987
-  m_clift <- mod_F2 %>%
+  m_clift <- mod_hab %>%
     filter(Location=="CLIFT") %>% 
     group_by(Date) %>%
     summarise(sum=sum(resid))
@@ -397,7 +374,7 @@ mod_F2$resid = resid(m_F2) #create a column for each survey event's residuals
                               time =  m_clift$Date) #test resid for temporal autocorrelation
 
 #Double Bay - DW = 2.2347, p-value = 0.8496
-  m_doubl <- mod %>%
+  m_doubl <- mod_hab %>%
     filter(Location=="DOUBL") %>%
     group_by(Date) %>%
     summarise(sum=sum(resid))
@@ -406,7 +383,7 @@ mod_F2$resid = resid(m_F2) #create a column for each survey event's residuals
                               time =  m_doubl$Date) #test resid for temporal autocorrelation
 
 #Neutral Bay - DW = 2.767, p-value = 0.3581
-  m_neutr <- mod %>%
+  m_neutr <- mod_hab %>%
     filter(Location=="NEUTR") %>%
     group_by(Date) %>%
     summarise(sum=sum(resid))
@@ -414,7 +391,7 @@ mod_F2$resid = resid(m_F2) #create a column for each survey event's residuals
   testTemporalAutocorrelation(m_neutr$sum, 
                               time =  m_neutr$Date) #test resid for temporal autocorrelation
 #Parsley Bay - DW = 1.2492, p-value = 0.4578
-    m_parsl <- mod_F2 %>%
+    m_parsl <- mod_hab %>%
     filter(Location=="PARSL") %>%
     group_by(Date) %>%
     summarise(sum=sum(resid))
@@ -422,7 +399,7 @@ mod_F2$resid = resid(m_F2) #create a column for each survey event's residuals
   testTemporalAutocorrelation(m_parsl$sum, 
                               time =  m_parsl$Date) #test resid for temporal autocorrelation
 #Watsons Bay - DW = 2.8324, p-value = 0.3741
-    m_watso <- mod %>%
+    m_watso <- mod_hab %>%
     filter(Location=="WATSO") %>%
     group_by(Date) %>%
     summarise(sum=sum(resid))
@@ -545,7 +522,9 @@ fit_4th <- gllvm(y, X, TR, family = "negative.binomial", num.lv = 2,
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
                       formula = y ~ (0 + Habitat + DistKm + Coast) + 
-                        (Habitat + DistKm + Coast) : (Material + Dispersiveness + Fishing), 
+                        (Habitat + DistKm + Coast) : (Material + Dispersiveness + Fishing),
+                      seed = 123, row.eff = "random", n.init = 3, jitter.var = 0.01, 
+                      randomX = ~ Habitat + DistKm + Coast,
                       family = "negative.binomial")
 coefplot(fit_4th)
 coefplot(fit_allfixed)
@@ -570,28 +549,5 @@ plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables",
                       ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
                       at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
 plot.4th
-```
-
-
-```{r glm-material, warning=FALSE, message=FALSE}
-
-#create df to use for models
-mod <- mat_select %>%
-  dplyr::filter(Material=="Glass") %>%
-  group_by(Date, Location, Habitat, DistKm, NumberSurveys,
-           Fishing) %>% #relevant variables
-  summarise(Total=sum(Total)) 
-
-#GLM negative binomial with two variables
-m_glass  <- glmmTMB(Total ~ #Debris count
-                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
-                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
-                 (1|Location/Date), #site random effect
-                 # (1|Dispersiveness) + #dispersiveness random effect
-                 # ar1(Date + 0 | Location) +
-                 # offset(log(NumberSurveys)), #offset by survey count
-               # zi = ~1, #zero inflation
-               family=nbinom2(), #negative binomial to deal with count data and zeros
-               data = mod) 
 ```
 
