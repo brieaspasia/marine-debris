@@ -36,6 +36,9 @@ library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
 library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
+library(corrplot) #co-occurrence matrix
+library(gclus) #co-occurrence matrix
+library(gtsummary) #regression tables
 
 #Tutorial
 #https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
@@ -132,22 +135,36 @@ Debris type is not considered as a random effect because in this instance it is 
 ```{r glm-hab, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_hab <- site_select %>%
-  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_hab  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat (fishing or non-fishing)
                  Coast + #predicted by aspect (fishing or non-fishing)
+                   DistKm + 
                  (1|Location/Date), #date random effect
-                 # (1|Dispersiveness) + #dispersiveness random effect
-                 # ar1(Date + 0 | Location) +
-                 # offset(log(NumberSurveys)), #offset by survey count
-               # zi = ~1, #zero inflation
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_hab) 
-
 ```
+```{r clean-table-lme4}
+# m_hab_lme4 <- glmer.nb(Total ~ #Debris count
+#                  Habitat + #predicted by Habitat (fishing or non-fishing)
+#                  Coast + #predicted by aspect (fishing or non-fishing)
+#                    DistKm +
+#                  (1|Location/Date), #date random effect
+#                data = mod_hab)
+#
+# summary(m_hab_lme4)
+#
+# m_hab_lme4 %>%
+#   tbl_regression(exponentiate = TRUE) %>%
+#   bold_labels()
+
+tab_model(m_hab)
+```
+
+
 # Summary - these concepts are important as comparisons between different model fits, but the numbers themselves aren't necessarily important.
   ## AIC estimates out of sample prediction error and thereby relative quality of model
   ## BIC (Bayesian information criterion) is a criterion for model selection among a finite set of models; the model with the lowest BIC is preferred.
@@ -184,13 +201,14 @@ plotQQunif(m_hab, testDispersion=FALSE)
 #create df to use for models
 mod_fish <- site_select %>%
   filter(Fishing=="Fishing") %>% #fishing line
-  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_fish  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat 
                  Coast + #predicted by distance from mouth 
+                   DistKm +
                  (1|Location/Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_fish) 
@@ -218,13 +236,14 @@ testZeroInflation(simulationOutput_fish) #tests if there are more zeros than exp
 #create df to use for models
 mod_nonfish <- site_select %>%
   filter(Fishing=="Non-Fishing") %>% #fishing line
-  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_nonfish  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat 
                  Coast + #predicted by distance from mouth 
+                   DistKm +
                  (1|Location/Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_nonfish) 
@@ -247,18 +266,91 @@ testDispersion(simulationOutput_nonfish) #tests if the simulated dispersion is e
 testQuantiles(simulationOutput_nonfish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_nonfish) #tests if there are more zeros than expected
 ```
+```{r glm-plastic, warning=FALSE, message=FALSE}
+#create df of all plastic materials
+mod_plas <- site_select %>%
+  filter(Material=="Plastic") %>% 
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
 
+#GLM negative binomial with two variables and zero inflation
+m_plas  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                 Coast + #predicted by aspect
+                   DistKm + 
+                 (1|Location/Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_plas) 
+
+```
+
+
+```{r model-summary-plas}
+summary(m_plas)
+coef(m_plas)
+```
+
+```{r simulation-output-m_plas}
+#simulation output for hook/sinker counts
+simulationOutput_plas <- simulateResiduals(fittedModel = m_plas, plot=T)
+  
+plotResiduals(simulationOutput_plas)
+
+testUniformity(simulationOutput_plas) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_plas) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput_plas) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput_plas) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(simulationOutput_plas) #tests if there are more zeros than expected
+```
+
+```{r glm-othermat, warning=FALSE, message=FALSE}
+#create df of all misc materials
+mod_oth <- site_select %>%
+  filter(Material=="Other") %>% #rubber, cloth, e-waste, ceramic, timber, bricks, etc
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m_oth  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                 Coast + #predicted by aspect
+                   DistKm + 
+                 (1|Location/Date), #site/date random effect
+               family=nbinom2(), #negative binomial to deal with count data and zeros
+               data = mod_oth) 
+
+```
+
+
+```{r model-summary-oth}
+summary(m_oth)
+coef(m_oth)
+```
+
+```{r simulation-output-m_oth}
+#simulation output for misc materials
+simulationOutput_oth <- simulateResiduals(fittedModel = m_oth, plot=T)
+  
+plotResiduals(simulationOutput_oth)
+
+testUniformity(simulationOutput_oth) #tests if the overall distribution conforms to expectations
+testOutliers(simulationOutput_oth) #tests if there are more simulation outliers than expected
+testDispersion(simulationOutput_oth) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(simulationOutput_oth) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(simulationOutput_oth) #tests if there are more zeros than expected
+```
 ```{r glm-F2, warning=FALSE, message=FALSE}
 #create df of fishing line to use for models
 mod_F2 <- site_select %>%
   filter(ID=="F2") %>% #fishing line
-  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_F2  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat 
                  Coast + #predicted by distance from mouth 
+                   DistKm +
                  (1|Location/Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_F2) 
@@ -287,13 +379,14 @@ testZeroInflation(simulationOutput_F2) #tests if there are more zeros than expec
 #create df of glass bottles to use for models
 mod_btl <- site_select %>%
   filter(ID=="G1") %>% #glass bottles
-  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_btl  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat 
                  Coast + #predicted by aspect
+                   DistKm +
                  (1|Location/Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_btl) 
@@ -323,15 +416,16 @@ testZeroInflation(simulationOutput_btl) #tests if there are more zeros than expe
 #create df of fishing hooks/sinkers to use for models
 mod_hook <- site_select %>%
   filter(ID=="F6") %>% #fishhooks and sinkers
-  group_by(Date, Location, Habitat, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_hook  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
                  Coast + #predicted by aspect
+                   DistKm +
                  (1|Location/Date), #site/date random effect
-               family=nbinom2(), #negative binomial to deal with count data and zeros
+               family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_hook) 
 
 ```
@@ -507,47 +601,52 @@ TR2 <- data.frame(sp = 1:62, TR)
 datalong <- merge(yX, TR2, by = "sp")
 ```
 # Fourth corner model
-Coefficient plot shows that there are a few significant variables including Habitat affected by fishing, habitat on its own, and the dispersiveness category of unencumbered drift.  
+Coefficient plot shows estimated coefficients (ticks) and their 95% confidence interval (lines). that there are a few significant variables including Habitat affected by fishing, habitat on its own, and the dispersiveness category of unencumbered drift.  
 
-#Is the unencumbered drift affected by something off-screen?  It looks like it's cutting off the text on the left.  Also, not quite sure how to read the plots.
 ```{r model-long}
-# Model with environmental and trait variables as predictors
-fit_4th <- gllvm(y, X, TR, family = "negative.binomial", num.lv = 2, 
-                      formula = y ~ (0 + Habitat + DistKm + Coast) + 
-                        (Habitat + DistKm + Coast) : (Material + Dispersiveness + Fishing),
-                      seed = 123, row.eff = "random", n.init = 3, jitter.var = 0.01, 
-                      randomX = ~ Habitat + DistKm + Coast)
-
-
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
                       formula = y ~ (0 + Habitat + DistKm + Coast) + 
                         (Habitat + DistKm + Coast) : (Material + Dispersiveness + Fishing),
-                      seed = 123, row.eff = "random", n.init = 3, jitter.var = 0.01, 
-                      randomX = ~ Habitat + DistKm + Coast,
+                      seed = 123, row.eff = "random", n.init = 3, jitter.var = 0.01,
+                      # randomX = ~ Habitat + DistKm + Coast,
                       family = "negative.binomial")
-coefplot(fit_4th)
 coefplot(fit_allfixed)
 ```
+# Latent variables
+The latent variables in gllvm would be correlation between types of rubbish (where you either have rubbish type as a categorical predictor or as separate columns in the response matrix). You would expect e.g. correlation between types of rubbish that may be generated from similar activities- e.g. beach parties, fishing etc. e.g. bottles and bottle caps and plastic wrappers may have a relationship, all coming from beach parties. Correlation can also come from missing predictors in the model. -- Eve
+```{r latent-variables}
+#biplot - clusters of debris items with numbers representing sites
+ordiplot(fit_allfixed, biplot=TRUE)
+
+fit_env <- gllvm(y, X, family="negative.binomial") #abundance + env traits
+cr <- getResidualCor(fit_env) #residual correlation matrix
+
+#correlation matrix for debris types
+corrplot(cr[order.single(cr), 
+            order.single(cr)], 
+         diag=FALSE, #whether display coefs on the principal diagonal
+         type="lower", #displays lower triangle matrix
+         method="circle", #visualization method
+         tl.cex = 0.5, tl.srt=45, tl.col="red")
+
+```
+
 # Fourth corner heatmap
-Here we see that nothing is significantly interacting with distance, however both fishing and unencumbered drift are interacting with habitat significantly.
+Here we see that nothing is significantly interacting with distance from harbour mouth or coast, however fishing interacts with habitat significantly. Brighter colours represent stronger associations, red are positive associations and blue are negative.
 ```{r 4th-corner-heatmap}
-coefplot(fit_allfixed, mar = c(4, 11, 1, 1), cex.ylab = 0.8)
 fourth <- fit_allfixed$fourth.corner
 a <- max( abs(fourth) )
 colort <- colorRampPalette(c("blue", "white", "red"))
-plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables", 
-                      ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
-                      at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
-plot.4th
+plot.4th <- levelplot((as.matrix(fourth)), 
+                      xlab = "Environmental Variables", 
+                      ylab = "Debris traits",
+                      col.regions = colort(100), #use defined colour palette
+                      cex.lab = 1.3, #specify size of the label text
+                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
+                      scales = list(x = list(rot = 45))) #rotate text for clarity
 
-coefplot(fit_4th, mar = c(4, 11, 1, 1), cex.ylab = 0.8)
-fourth <- fit_4th$fourth.corner
-a <- max( abs(fourth) )
-colort <- colorRampPalette(c("blue", "white", "red"))
-plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables", 
-                      ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
-                      at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
+
 plot.4th
 ```
 
