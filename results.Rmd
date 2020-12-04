@@ -96,7 +96,7 @@ item_code <- item_code %>%
 site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
 
 site_select <- site_select %>%
-  mutate(item = paste(Material, item_name,sep=": "))
+  mutate(item = paste(Material, item_name.code, sep=": "))
 ```
 
 # Site attributes
@@ -124,34 +124,37 @@ knitr::include_graphics("images/results-map.png")
 ```{r pier-vs-ss-items}
 #isolate Pier sites
 here::here()
-total_hab <- site_select
 
-Location = unique(total_hab$Location) %>% as.character()
-      
+LocationLabs <- c(NEUTR = "Neutral Bay", CLIFT = "Clifton Gardens", PARSL = "Parsley Bay", WATSO = "Watsons Bay", DOUBL = "Double Bay")
+HabitatLabs <- c(P = "Pier", SS = "Sediment")
+
+Location = unique(site_select$Location) %>% as.character()
+
 for(x in Location){
   
 #2.1 Define temp Location
-  total_hab <- total_hab %>% filter(Location==x) %>%
+  total_hab <- site_select %>% filter(Location==x) %>%
   group_by(Habitat) %>% #group by site
   summarise(sum=sum(Total), #total items per site
             mean=mean(sum)/unique(NumberSurveys), #mean of items by hab
             sd=sd(Total)) %>% 
+     mutate(label_y=cumsum(mean) - 0.5 * mean) %>%
+    mutate(across(is.numeric, ~ round(.,0))) %>%
             ungroup()
+
 
 #2.11 Material by land use
 p_hab <- ggplot(total_hab, aes(x = Habitat, y = mean, fill = Habitat)) +
-         geom_bar(position="dodge", stat="identity") +
+         geom_bar(position="dodge", stat="identity", show.legend=FALSE) +
   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
-         geom_text(aes(label = mean), vjust = -0.5, color = "black", size = 2) +
-         theme(axis.text.x=element_text(color = "black", vjust=.8,
-                                 angle=30, hjust=0.8)) +
-         ggtitle("Mean debris count by habitat", subtitle = x) +
-         labs(y="Mean debris count per habitat", x="Habitat")
+         geom_text(aes(label = mean, y=label_y), color = "white", size = 6, position=position_dodge(width=0.90)) +
+         ggtitle("Mean debris count by habitat") +
+  scale_x_discrete(labels= HabitatLabs) +
+         labs(y="Mean debris count per survey", x="Habitat") +
+  theme_minimal()
 
- ggsave(filename = paste0(here::here("Output"),"/",x,"_hab_mean.jpg"),
-        plot = p_hab, dpi = 600)
-
-dev.off()
+ ggsave(filename = paste0(here::here("figures"),"/",x,"_hab_mean.png"),
+        plot = p_hab, dpi = 300)
 
 }
 ```
@@ -165,7 +168,6 @@ total_item <- site_select %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
         dplyr::select(item, sum, sd) %>% #remove irrelevant columns
-        filter(sum>0) %>% #remove zero values
         arrange(desc(sum)) %>% #show high counts first
         distinct() %>% #remove duplicate entries
         ungroup()
@@ -245,12 +247,21 @@ site_total_mat$Material <- as.character(site_total_mat$Material)
 #set lesser used categories to 'Other'
 site_total_mat$Material[site_total_mat$Material %in% var_change] = "Other" 
   
-#find the top distribution of material type across all sites
+# #find the top distribution of material type across all sites
+# total_mat <- site_total_mat %>%
+#   group_by(Site, Material) %>%  #group by material findings at each site
+#   summarise(sum=sum(Total), #total items per each material per site
+#             mean=mean(sum)/unique(NumberSurveys), #mean of items by material type per site
+#             sd=sd(Total)) %>% 
+#             ungroup()
+
+#find the top distribution of material type across all habitats
 total_mat <- site_total_mat %>%
-  group_by(Site, Material) %>%  #group by material findings at each site
+  group_by(Habitat, Material) %>%  #group by material findings at each site
   summarise(sum=sum(Total), #total items per each material per site
-            mean=mean(sum)/unique(NumberSurveys), #mean of items by material type per site
             sd=sd(Total)) %>% 
+  mutate(label_y=cumsum(sum) - 0.5 * sum) %>%
+    mutate(across(is.numeric, ~ round(.,0))) %>%
             ungroup()
 ```
 ```{r material-counts, warning=FALSE, fig.cap="Figure 2: Mean items by material type per site and habitat"}
@@ -266,15 +277,15 @@ LocationLabs <- c(NEUTR = "Neutral Bay", CLIFT = "Clifton Gardens", PARSL = "Par
 HabitatLabs <- c(P = "Pier", SS = "Sediment")
 
 p_total_mat <- total_mat %>%
-  ggplot( aes(x=Habitat, y=mean, fill=Material)) +
+  ggplot( aes(x=Habitat, y=sum, fill=Material)) +
   geom_bar(position="dodge", stat="identity") +
-  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
+  geom_errorbar(aes(ymin=sum-sd, ymax=sum+sd, width=0.2), position=position_dodge(width=0.90)) +
   theme(axis.text.x=element_text(color = "black", size=11, 
                                  vjust=.8, angle=30, hjust=0.8)) +
   ylab("Mean item count by material type") + 
   scale_x_discrete(labels= HabitatLabs) +
-  ggtitle("Mean of items by material per site") +
-  facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scales = "free_y")
+  ggtitle("Mean of items by material per habitat")
+  # facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scales = "free_y")
 
 p_total_mat
 ``` 

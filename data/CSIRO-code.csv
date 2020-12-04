@@ -8,13 +8,13 @@ H6,Utensil/plate/bowl,Plastic,Hard Plastic,Non-fishing,Very mobile
 H7,Bucket/crate,Plastic,Hard Plastic,Non-fishing,Very mobile
 H8,Lighter,Plastic,Hard Plastic,Non-fishing,Very mobile
 H9,Lollipop stick/earbud,Plastic,Hard Plastic,Non-fishing,Very mobile
-H10,Unknown/other hard,Plastic,Hard Plastic,Non-fishing,Encumbered drift
+H10,Unknown/hard scraps,Plastic,Hard Plastic,Non-fishing,Encumbered drift
 S1,Thin film carry bag,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 S2,Food wrapper/label,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 S3,Sheeting,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 S4,Cup/lid,Plastic,Soft Plastic,Non-fishing,Very mobile
 S5,Straw,Plastic,Soft Plastic,Non-fishing,Very mobile
-S6,Unknown/other soft,Plastic,Soft Plastic,Non-fishing,Encumbered drift
+S6,Unknown/soft scraps,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 S7,Other plastic bag,Plastic,Soft Plastic,Non-fishing,Encumbered drift
 BP1,String/rope/ribbon,Plastic,Plastic Straps,Non-fishing,Limited dispersion
 BP2,Packing strap,Plastic,Plastic Straps,Non-fishing,Encumbered drift
@@ -29,7 +29,7 @@ M6,Lid/cap,Metal,,Non-fishing,Limited dispersion
 M7,Food wrapper,Metal,,Non-fishing,Encumbered drift
 M8,Aluminum foil,Metal,,Non-fishing,Encumbered drift
 M9,Bucket/drum,Metal,,Non-fishing,Encumbered drift
-M10,Unknown/other hard,Metal,,Non-fishing,Limited dispersion
+M10,Unknown / Scraps,Metal,,Non-fishing,Limited dispersion
 M11,Unknown/other soft,Metal,,Non-fishing,Limited dispersion
 G1,Beverage bottle,Glass,,Non-fishing,Limited dispersion
 G2,Jar,Glass,,Non-fishing,Limited dispersion
@@ -71,7 +71,7 @@ F3,Fishing lures,Plastic,,Fishing,Limited dispersion
 F4,buoys/floats,Plastic,,Fishing,Very mobile
 F5,Glow stick,Plastic,,Fishing,Encumbered drift
 F6,Fishhook/sinker,Metal,,Fishing,Limited dispersion
-F7,Unknown/other,Undetermined,,Fishing,Limited dispersion
+F7,Fishing related,Undetermined,,Fishing,Limited dispersion
 Z1,Battery,E-Waste,,Non-fishing,Limited dispersion
 Z2,Brick/cement,Brick or Cement,,Non-fishing,Limited dispersion
 Z3,Carpet,Plastic,,Non-fishing,Limited dispersion
