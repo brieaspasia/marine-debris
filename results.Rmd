@@ -91,12 +91,12 @@ item_code <- read.csv(file="data/CSIRO-code.csv",
 #filter out material as some item types may have more than one material type 
 #(ex. fishing items, furniture)
 item_code <- item_code %>%
-  dplyr::select(ID, item_name, Dispersiveness) 
+  dplyr::select(ID, item_name, Material, Dispersiveness, Fishing) 
 
 site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
 
 site_select <- site_select %>%
-  mutate(item = paste(Material, item_name.code, sep=": "))
+  mutate(item = paste(Material, item_name, sep=": "))
 ```
 
 # Site attributes
@@ -270,8 +270,8 @@ site_habitat <- site_select %>%
   dplyr::select(Site, Habitat, Location) %>%
   distinct() 
 
-#join for labeling
-total_mat <- left_join(total_mat, site_habitat, by="Site") 
+# #join for labeling (not important if only looking at habitats)
+# total_mat <- left_join(total_mat, site_habitat, by="Site") 
 
 LocationLabs <- c(NEUTR = "Neutral Bay", CLIFT = "Clifton Gardens", PARSL = "Parsley Bay", WATSO = "Watsons Bay", DOUBL = "Double Bay")
 HabitatLabs <- c(P = "Pier", SS = "Sediment")
@@ -282,9 +282,9 @@ p_total_mat <- total_mat %>%
   geom_errorbar(aes(ymin=sum-sd, ymax=sum+sd, width=0.2), position=position_dodge(width=0.90)) +
   theme(axis.text.x=element_text(color = "black", size=11, 
                                  vjust=.8, angle=30, hjust=0.8)) +
-  ylab("Mean item count by material type") + 
+  ylab("Sum of debris items") + 
   scale_x_discrete(labels= HabitatLabs) +
-  ggtitle("Mean of items by material per habitat")
+  ggtitle("Debris material types per habitat")
   # facet_wrap(~Location, labeller = labeller(Location=LocationLabs), scales = "free_y")
 
 p_total_mat
@@ -318,22 +318,33 @@ p_fishing
 # Statistics
 
 ## GLMM negative binomial model
-I aggregated debris totals by survey date and location and used a negative binomial GLMM model to fit the data.  Debris totals are predicted by habitat and distance from harbour mouth, both effected by whether debris was fishing related.  Location and Date are random effects.  All p-values are significant with this model fit.
-```{r glm-2, warning=FALSE, message=FALSE}
+I aggregated debris totals by survey date and location and used a negative binomial GLMM model to fit the data.  Debris totals are predicted by habitat, distance from harbour mouth, and aspect (north or south coast).  Location and Date are random effects.  
+
+```{r glm-hab, warning=FALSE, message=FALSE}
 #create df to use for models
-mod <- site_select %>%
-  group_by(Date, Location, Habitat, DistKm, NumberSurveys,
-           Fishing) %>% #relevant variables
-  summarise(Total=sum(Total)) 
+mod_hab <- site_select %>%
+  group_by(Date, Location, Habitat, DistKm, Coast) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  mutate(Date = as.factor(Date),
+         Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Coast = as.factor(Coast))
+         
 
 #GLM negative binomial with two variables and zero inflation
-m2  <- glmmTMB(Total ~ #Debris count
-                 Fishing*Habitat + #predicted by Habitat (fishing or non-fishing)
-                 Fishing*DistKm + #predicted by distance from mouth (fishing or non-fishing)
-                 (1|Location/Date), #site random effect
-               family=nbinom2(), #negative binomial to deal with count data and zeros
-               data = mod) 
-summary(m2)
+m_hab  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                   DistKm + #distance from harbour mouth
+                   Coast + #north or south coast
+                 (1|Location/Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_hab) 
+
+
+drop1(m_hab, test = "Chisq") #coast is not significant
+AIC(m_hab1, m_hab2) #but AIC shows less than 2 pts difference with or without coast so it stays
+
+
 ```
 ## DHARMa simulation output
 A visual inspection of the QQ plot could not identify deviations from normality.
@@ -434,6 +445,16 @@ fit_allfixed <- gllvm(data=datalong,
                         (Habitat + DistKm + Coast) : (Dispersiveness + Fishing + Material), 
                       family = "negative.binomial")
 
+fit_coast <- gllvm(data=datalong, 
+                      formula = y ~ (0 + Habitat + DistKm) + 
+                        (Habitat + DistKm) : (Dispersiveness + Fishing + Material), 
+                      family = "negative.binomial")
+
+fit_hab <- gllvm(data=datalong, 
+                      formula = y ~ (0 + Habitat) + 
+                        (Habitat) : (Dispersiveness + Fishing + Material), 
+                      family = "negative.binomial")
+
 fit_4th <- gllvm(y, X, TR, family = "negative.binomial", num.lv = 2, 
                  formula = y ~ (Habitat + DistKm + Coast) +
                 (Habitat + DistKm + Coast) : (Dispersiveness + 
@@ -448,4 +469,13 @@ plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables",
                       ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
                       at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
 plot.4th
+coefplot(fit_hab)
+
+fourth <- fit_coast$fourth.corner
+a <- max( abs(fourth) )
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables", 
+                      ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
+                      at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
 ```
+

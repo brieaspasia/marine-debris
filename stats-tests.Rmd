@@ -100,8 +100,11 @@ item_code <- read.csv(file="data/CSIRO-code.csv",
 
 site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code")) 
 
-#state variables to rename
-var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+#state variables to rename (strict)
+var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "")
+
+# #state variables to rename (loose)
+# var_change <- c("Ceramic", "Undetermined", "Paper", "Construction", "Organic", "Unknown", "Foam", "") 
 
 #change Material to character
 site_select$Material <- as.character(site_select$Material) 
@@ -189,7 +192,7 @@ testZeroInflation(simulationOutput_hab) #tests if there are more zeros than expe
 plotQQunif(m_hab, testDispersion=FALSE)
 ```
 # Q2 Does fishing or non-fishing debris type impact distribution?
-  ## Testing fishing related debris
+## Testing fishing related debris
 ```{r glm-fish, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_fish <- site_select %>%
@@ -230,7 +233,7 @@ testDispersion(simulationOutput_fish) #tests if the simulated dispersion is equa
 testQuantiles(simulationOutput_fish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_fish) #tests if there are more zeros than expected
 ```
-  ## Testing non-fishing related debris
+## Testing non-fishing related debris
 ```{r glm-nonfish, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_nonfish <- site_select %>%
@@ -271,6 +274,7 @@ testDispersion(simulationOutput_nonfish) #tests if the simulated dispersion is e
 testQuantiles(simulationOutput_nonfish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_nonfish) #tests if there are more zeros than expected
 ```
+## Testing fishing line debris type
 
 ```{r glm-F2, warning=FALSE, message=FALSE}
 #create df of fishing line to use for models
@@ -312,7 +316,7 @@ testDispersion(simulationOutput_F2) #tests if the simulated dispersion is equal 
 testQuantiles(simulationOutput_F2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_F2) #tests if there are more zeros than expected
 ```
-
+## Testing glass bottles debris type
 ```{r glm-btl, warning=FALSE, message=FALSE}
 #create df of glass bottles to use for models
 mod_btl <- site_select %>%
@@ -353,8 +357,8 @@ m_btl  <- glmmTMB(Total ~ #Debris count
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_btl) 
 
-drop1(m_btl, test = "Chisq") #decision to drop distKM from the model
-AIC(m_btl, m_btl2, m_btl3, m_btl4) #testing either dist, coast, with both, without both
+# drop1(m_btl, test = "Chisq") #decision to drop distKM from the model
+# AIC(m_btl, m_btl2, m_btl3, m_btl4) #testing either dist, coast, with both, without both
 
 ```
 
@@ -376,7 +380,7 @@ testDispersion(simulationOutput_btl) #tests if the simulated dispersion is equal
 testQuantiles(simulationOutput_btl) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_btl) #tests if there are more zeros than expected
 ```
-
+## Testing hooks/sinkers debris type
 ```{r glm-hook, warning=FALSE, message=FALSE}
 #create df of fishing hooks/sinkers to use for models
 mod_hook <- site_select %>%
@@ -532,14 +536,17 @@ Creating dataframes for abundance of debris types, environmental variables, and 
     inner_join(IDs, by="ID") %>% #remove items with 0 count
     column_to_rownames(var="ID") #create rownames from ID
   
-  #state variables to rename
-  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+  #state variables to rename (strict)
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "")
+  
+#   #state variables to rename (loose)
+# var_change <- c("Ceramic", "Undetermined", "Paper", "Construction", "Organic", "Unknown", "Foam", "Rubber", "Timber", "E-waste", "") 
   
   #change Material to character
   TR$Material <- as.character(TR$Material) 
   
   #set lesser used categories to 'Other'
-  TR$Material[TR$Material %in% var_change] = "Other" 
+  TR$Material[TR$Material %in% var_change] = "Other"
 
   TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
   TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
@@ -574,14 +581,21 @@ datalong <- merge(yX, TR2, by = "sp")
 Coefficient plot shows estimated coefficients (ticks) and their 95% confidence interval (lines). that there are a few significant variables including Habitat affected by fishing, habitat on its own, and the dispersiveness category of unencumbered drift.  
 
 ```{r model-long}
+#model with environmental variables as predictors
+fit_env <- gllvm(y, X, family="negative.binomial", 
+                 formula = y ~ (0 + Coast + DistKm + Habitat))
+coefplot(fit_env)
+
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
                       formula = y ~ (0 + Habitat + DistKm + Coast) + 
                         (Habitat + DistKm + Coast) : (Material + Dispersiveness + Fishing),
-                      seed = 123, row.eff = "random", n.init = 3, jitter.var = 0.01,
-                      # randomX = ~ Habitat + DistKm + Coast,
                       family = "negative.binomial")
 coefplot(fit_allfixed)
+
+anova(fit_env, fit_allfixed)
+
+
 ```
 # Latent variables
 The latent variables in gllvm would be correlation between types of rubbish (where you either have rubbish type as a categorical predictor or as separate columns in the response matrix). You would expect e.g. correlation between types of rubbish that may be generated from similar activities- e.g. beach parties, fishing etc. e.g. bottles and bottle caps and plastic wrappers may have a relationship, all coming from beach parties. Correlation can also come from missing predictors in the model. -- Eve
