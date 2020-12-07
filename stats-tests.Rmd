@@ -140,6 +140,7 @@ Debris type is not considered as a random effect because in this instance it is 
 mod_hab <- site_select %>%
   group_by(Date, Location, Habitat, DistKm, Coast) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
+  ungroup() %>%
   mutate(Date = as.factor(Date),
          Location = as.factor(Location),
          Habitat = as.factor(Habitat),
@@ -199,6 +200,7 @@ mod_fish <- site_select %>%
   filter(Fishing=="Fishing") %>% #fishing line
   group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
+  ungroup() %>%
               mutate(Date = as.factor(Date),
          Location = as.factor(Location),
          Habitat = as.factor(Habitat),
@@ -240,6 +242,7 @@ mod_nonfish <- site_select %>%
   filter(Fishing=="Non-Fishing") %>% #fishing line
   group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
+  ungroup() %>%
               mutate(Date = as.factor(Date),
          Location = as.factor(Location),
          Habitat = as.factor(Habitat),
@@ -282,6 +285,7 @@ mod_F2 <- site_select %>%
   filter(ID=="F2") %>% #fishing line
   group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
+  ungroup() %>%
               mutate(Date = as.factor(Date),
          Location = as.factor(Location),
          Habitat = as.factor(Habitat),
@@ -323,6 +327,7 @@ mod_btl <- site_select %>%
   filter(ID=="G1") %>% #glass bottles
   group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
+  ungroup() %>%
               mutate(Date = as.factor(Date),
          Location = as.factor(Location),
          Habitat = as.factor(Habitat),
@@ -387,6 +392,7 @@ mod_hook <- site_select %>%
   filter(ID=="F6") %>% #fishhooks and sinkers
   group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
+  ungroup() %>%
               mutate(Date = as.factor(Date),
          Location = as.factor(Location),
          Habitat = as.factor(Habitat),
