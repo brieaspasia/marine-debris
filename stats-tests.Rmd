@@ -34,7 +34,7 @@ library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
-library(gllvm) #for multivariate abundance
+#library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
 library(corrplot) #co-occurrence matrix
 library(gclus) #co-occurrence matrix
@@ -158,7 +158,7 @@ m_hab  <- glmmTMB(Total ~ #Debris count
 
 
 drop1(m_hab, test = "Chisq") #coast is not significant
-AIC(m_hab1, m_hab2) #but AIC shows less than 2 pts difference with or without coast so it stays
+#AIC(m_hab1, m_hab2) #but AIC shows less than 2 pts difference with or without coast so it stays
 
 
 ```
@@ -187,10 +187,10 @@ plotResiduals(simulationOutput_hab)
 testUniformity(simulationOutput_hab) #tests if the overall distribution conforms to expectations
 # testOutliers(simulationOutput_hab) #tests if there are more simulation outliers than expected
 testDispersion(simulationOutput_hab) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_hab) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+#testQuantiles(simulationOutput_hab) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_hab) #tests if there are more zeros than expected
 
-plotQQunif(m_hab, testDispersion=FALSE)
+#plotQQunif(m_hab, testDispersion=FALSE)
 ```
 
 # Plotting model predictions
@@ -210,17 +210,24 @@ nd <- expand.grid(Habitat = unique(mod_hab$Habitat),
                   DistKm = seq(from = min(mod_hab$DistKm),
                                to = max(mod_hab$DistKm),
                                length=1000),
-                  Coast = unique(mod_hab$Coast))
+                  Coast = unique(mod_hab$Coast),
+                  Location = NA,
+                  Date = NA)
 ```
 
 2. the predict function uses your model and the new dataframe from above to predict mean values of the response variable. It predicts a value for each row in the new dataframe. You should also be able to predict the standard error by setting se.fit to TRUE, though will need to assign the result to a different object or column in nd.
 
 ```{r}
-nd$p <- predict.glmmTMB(object = m_hab,
-                        newdata = nd,
-                        se.fit = F,
-                        re.form = NA,
-                        type="response")
+pred <- predict(object = m_hab,
+                         newdata = nd,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd$Total <- pred$fit
+nd$SE_upper <- pred$fit + pred$se.fit
+nd$SE_lower <- pred$fit - pred$se.fit
+
 ```
 
 3. plot the predicted means. You can add standard errors too but just see if this works first.
@@ -228,7 +235,8 @@ nd$p <- predict.glmmTMB(object = m_hab,
 
 ```{r}
 ggplot(nd, aes(y=Total, x=DistKm)) + 
-  geom_line(col=Coast) +
+  geom_line() +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
   facet_grid(Coast~Habitat, scales = "free_y") 
 ```
 
