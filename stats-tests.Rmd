@@ -38,9 +38,9 @@ library(corrplot) #co-occurrence matrix
 library(gclus) #co-occurrence matrix
 library(broom.mixed) #regression tables
 
-library(sjPlot)
-library(sjmisc)
-library(sjlabelled)
+library(sjPlot) #regression models as HTML table
+library(sjmisc) #regression models as HTML table
+library(sjlabelled) #regression models as HTML table
 
 #Tutorial
 #https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
@@ -1358,3 +1358,71 @@ ggplot(nd_met, aes(y=Total, x=Habitat)) +
   geom_col() +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
 ```
+```{r tidy-models}
+#Reference https://cran.r-project.org/web/packages/broom/vignettes/broom.html
+
+#This gives you a tabular data representation. Note that the row names have been moved into a column called term, and the column names are simple and consistent (and can be accessed using $).
+tidy(m_hab)
+
+#Instead of viewing the coefficients, you might be interested in the fitted values and residuals for each of the original points in the regression. For this, use augment, which augments the original data with information from the model:
+augment(m_hab)
+
+#Finally, several summary statistics are computed for the entire regression, such as R^2 and the F-statistic. These can be accessed with the glance function:
+glance(m_hab)
+```
+```{r tidy-tables}
+# Reference https://strengejacke.github.io/sjPlot/articles/tab_model_estimates.html
+#Base model
+tab_model(
+  m_hab,
+  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
+  col.order = c("est", "se", "p"),
+  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
+  dv.labels = c("Habitat"),
+  string.p = "P-Value",
+          string.est = "Estimate",
+          string.se = "Standard Error",
+          string.ci = "Conf. Int (95%)"
+)
+
+#Fishing vs non-fishing
+tab_model(
+  m_fish, m_nonfish,
+  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
+  col.order = c("est", "se", "p"),
+  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
+  dv.labels = c("Fishing related debris", "Nonfishing related debris"),
+  string.p = "P-Value",
+          string.est = "Estimate",
+          string.se = "Standard Error",
+          string.ci = "Conf. Int (95%)"
+)
+
+#Top items
+tab_model(
+  m_F2, m_btl, m_hook,
+  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
+  col.order = c("est", "se", "p"),
+  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
+  dv.labels = c("Fishing line", "Glass bottles", "Fish hooks/sinkers"),
+  string.p = "P-Value",
+          string.est = "Estimate",
+          string.se = "Standard Error",
+          string.ci = "Conf. Int (95%)"
+)
+
+#Material types
+tab_model(
+  m_plas, m_gls, m_met, m_oth,
+  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
+  col.order = c("est", "se", "p"),
+  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
+  dv.labels = c("Plastic debris", "Glass debris", "Metal debris", "Other debris"),
+  string.p = "P-Value",
+          string.est = "Estimate",
+          string.se = "Standard Error",
+          string.ci = "Conf. Int (95%)"
+)
+
+```
+
