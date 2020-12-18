@@ -33,8 +33,8 @@ library(MASS) #stats
 library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
-library(mvabund) #for multivariate stats
-library(gllvm) #for multivariate abundance
+# library(mvabund) #for multivariate stats
+# library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
 ```
 
@@ -153,6 +153,8 @@ p_hab <- ggplot(total_hab, aes(x = Habitat, y = mean, fill = Habitat)) +
          labs(y="Mean debris count per survey", x="Habitat") +
   theme_minimal()
 
+p_hab
+
  ggsave(filename = paste0(here::here("figures"),"/",x,"_hab_mean.png"),
         plot = p_hab, dpi = 300)
 
@@ -225,7 +227,7 @@ top6items_perHabitat <- top_items_per_habitat %>%
   dplyr::select(-Habitat) %>%
   mutate_if(is.numeric, format, digits=0) %>% #set no decimals
   kable("html", booktabs = TRUE, #nice format
-      col.names = c("item", "Sum", "SD", "Percent"),
+      col.names = c("Debris item", "Sum", "SD", "Percent"),
       caption = "Top 6 items per Habitat Type") %>% 
       pack_rows(index=c("Pier" = 6, "Sediment"=6)) %>%
       kable_styling(bootstrap_options="condensed", position="left") 

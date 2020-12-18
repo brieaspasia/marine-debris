@@ -592,7 +592,7 @@ m_F2  <- glmmTMB(Total ~ #Debris count
 
 drop1(m_F2, test = "Chisq") #decision to drop coast from the model
 
-AIC(m_F2, m_F22, m_F23, m_F24, m_F25, m_F26, m_F27) #AIC shows less than 2 pts difference without coast, so use habitat+distkm to keep less variables
+# AIC(m_F2, m_F22, m_F23, m_F24, m_F25, m_F26, m_F27) #AIC shows less than 2 pts difference without coast, so use habitat+distkm to keep less variables
 
 ```
 
@@ -712,7 +712,7 @@ m_hook  <- glmmTMB(Total ~ #Debris count
 
 drop1(m_hook, test = "Chisq") #decision to drop coast from the model
 
-AIC(m_hook, m_hook2, m_hook3, m_hook4, m_hook5, m_hook6, m_hook7) #AIC shows less than 2 pts difference without coast, so use habitat+distkm to keep less variables
+# AIC(m_hook, m_hook2, m_hook3, m_hook4, m_hook5, m_hook6, m_hook7) #AIC shows less than 2 pts difference without coast, so use habitat+distkm to keep less variables
 
 ```
 
@@ -825,7 +825,7 @@ m_btl  <- glmmTMB(Total ~ #Debris count
 #                data = mod_btl)
 
 drop1(m_btl, test = "Chisq") #decision to drop distKM + Coast from the model
-AIC(m_btl, m_btl2, m_btl3, m_btl4, m_btl5, m_btl6, m_btl7) #testing either dist, coast, with both, without both
+# AIC(m_btl, m_btl2, m_btl3, m_btl4, m_btl5, m_btl6, m_btl7) #testing either dist, coast, with both, without both
 
 ```
 
@@ -986,7 +986,7 @@ m_plas  <- glmmTMB(Total ~ #Debris count
 
 drop1(m_plas, test = "Chisq") #decision to drop coast from the model
 
-AIC(m_plas, m_plas2, m_plas3, m_plas4, m_plas5, m_plas6, m_plas7) #testing either dist, coast, with both, without both
+# AIC(m_plas, m_plas2, m_plas3, m_plas4, m_plas5, m_plas6, m_plas7) #testing either dist, coast, with both, without both
 
 ```
 
@@ -1095,7 +1095,7 @@ m_oth  <- glmmTMB(Total ~ #Debris count
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_oth)
 
-AIC(m_oth, m_oth2, m_oth3, m_oth4, m_oth5, m_oth6, m_oth7) #testing either dist, coast, with both, without both
+# AIC(m_oth, m_oth2, m_oth3, m_oth4, m_oth5, m_oth6, m_oth7) #testing either dist, coast, with both, without both
 
 drop1(m_oth, test = "Chisq") #decision to drop distKM from the model
 
@@ -1204,7 +1204,7 @@ m_gls  <- glmmTMB(Total ~ #Debris count
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_gls)
 
-AIC(m_gls, m_gls2, m_gls3, m_gls4, m_gls5, m_gls6, m_gls7) #testing either dist, coast, with both, without both
+# AIC(m_gls, m_gls2, m_gls3, m_gls4, m_gls5, m_gls6, m_gls7) #testing either dist, coast, with both, without both
 
 drop1(m_gls, test = "Chisq") #decision to drop distKM from the model
 
@@ -1309,7 +1309,7 @@ m_met  <- glmmTMB(Total ~ #Debris count
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_met)
 
-AIC(m_met, m_met2, m_met3, m_met4, m_met5, m_met6, m_met7) #testing either dist, coast, with both, without both
+# AIC(m_met, m_met2, m_met3, m_met4, m_met5, m_met6, m_met7) #testing either dist, coast, with both, without both
 
 drop1(m_met, test = "Chisq") #decision to drop distKM from the model
 
@@ -1385,6 +1385,9 @@ tab_model(
           string.ci = "Conf. Int (95%)"
 )
 
+?tab_model
+
+
 #Fishing vs non-fishing
 tab_model(
   m_fish, m_nonfish,
@@ -1424,5 +1427,17 @@ tab_model(
           string.ci = "Conf. Int (95%)"
 )
 
+#All
+tab_model(
+  m_hab, m_fish, m_nonfish, m_F2, m_btl, m_hook,
+  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
+  col.order = c("est", "se", "p"),
+  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
+  dv.labels = c("Habitat", "Fishing related debris", "Non-fishing related debris", "Fishing line", "Glass bottles", "Fish hooks/sinkers"),
+  string.p = "P-Value",
+          string.est = "Estimate",
+          string.se = "Standard Error",
+          string.ci = "Conf. Int (95%)"
+)
 ```
 
