@@ -51,7 +51,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ### SCOPUS column codes
 
 ```{r scopus-colnames}
-read.csv('data/scopus_colnames.csv', header=FALSE) %>%
+read.csv('data/scopus_colnames.csv', header=FALSE, fileEncoding="UTF-8-BOM") %>%
   kable("html", col.names = c("Scopus Code", "Meaning")) %>% kable_styling() %>% #format table
   scroll_box(width = "100%", height = "500px") #format scroll box
 ```
@@ -60,7 +60,9 @@ read.csv('data/scopus_colnames.csv', header=FALSE) %>%
 ### Loading SCOPUS dataset
 ```{r load-data, results='hide'}
 # Load bibtex files and format into bibliometrix object
-bib <- convert2df(file = c("./all_data/md_old.bib", "./all_data/md_recent.bib"), dbsource = "scopus", format = "bibtex")
+# bib <- convert2df(file = c("./all_data/md_old.bib", "./all_data/md_recent.bib"), dbsource = "scopus", format = "bibtex")
+
+bib <- convert2df(file = c("./data/md.bib"), dbsource = "scopus", format = "bibtex")
 
 save(bib, file = "./data/bib.RData") #save this data frame as RData
 ```
@@ -368,8 +370,7 @@ keywords <- word_table_total %>%
   group_by(Keyword) %>% #find duplicate matches
   mutate(Total=sum(Freq)) %>% #add duplicate occurrences
            ungroup() %>%
-  select(-Freq) %>% #remove redundant column
-  distinct()
+  select(-Freq) 
 
 write.csv(keywords, "output/keywords_total.csv", row.names = FALSE) #save this data frame as a csv file
 
