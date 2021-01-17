@@ -280,7 +280,9 @@ HabitatLabs <- c(P = "Pier", SS = "Sediment")
 
 p_total_mat <- total_mat %>%
   ggplot( aes(x=Habitat, y=sum, fill=Material)) +
+  scale_fill_grey() +
   geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label = sum), position= position_dodge(0.9), vjust = 1.5, color = "white", size = 5) +
   geom_errorbar(aes(ymin=sum-sd, ymax=sum+sd, width=0.2), position=position_dodge(width=0.90)) +
   theme(axis.text.x=element_text(color = "black", size=11, 
                                  vjust=.8, angle=30, hjust=0.8)) +
@@ -301,6 +303,12 @@ fishing <- site_select %>%
             mean=sum/unique(NumberSurveys),
             sd=sd(Total)) %>% #total per survey
   arrange(desc(mean))
+
+fishing_hab <- site_select %>%
+  group_by(Habitat, Fishing) %>% #group by fishing or non-fishing
+  summarise(sum=sum(Total), #total fishing items
+            sd=sd(Total)) %>% #total per survey
+  arrange(desc(sum))
 ```
 ```{r fishing-by-site, warning=FALSE, fig.cap="Figure 3: Fishing related debris"}
 site_habitat <- site_select %>%
@@ -316,6 +324,17 @@ p_fishing <- fishing %>%
   facet_wrap(~Location, scales = "free_y")
 
 p_fishing
+
+p_fishing_hab <- fishing_hab %>%
+  ggplot( aes(x=Habitat, y=sum, fill=Fishing)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=sum-sd, ymax=sum+sd, width=0.2), position=position_dodge(width=0.90)) +
+  scale_x_discrete(labels= HabitatLabs) +
+   geom_text(aes(label = sum), position= position_dodge(0.9), vjust = 1.5, color = "white", size = 5) +
+   ylab("Sum of debris items") +
+  scale_fill_grey()
+
+p_fishing_hab
 ```
 # Statistics
 
