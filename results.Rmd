@@ -119,7 +119,7 @@ We accomplished 36 survey events at 10 sites between November 2019 and February 
 ## Mean debris items per site
 Here we see the proportion of debris items recovered under piers in blue, and the proportion recovered on soft sediment in orange.  In total across all sites, over 90% of the total debris recorded was collected under piers. The mean debris count at each site indicates that debris increases closer to the harbour mouth. 
 ```{r results-map, fig.cap="Fig 1: Mean debris count and proportion per habitat", out.width = '100%'}
-knitr::include_graphics("images/results-map.png")
+knitr::include_graphics("images/Sites.png")
 ```
 ```{r pier-vs-ss-items}
 #isolate Pier sites
@@ -166,7 +166,7 @@ The most common item across all surveys was fishing line, at nearly 60% of the t
 ```{r top-items, fig.cap="Table 1: Top ten debris types across all surveys"}
 #Find the top item types across all surveys
 total_item <- site_select %>%
-  group_by(item) %>%
+  group_by(Material, item_name) %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
         dplyr::select(item, sum, sd) %>% #remove irrelevant columns
@@ -178,16 +178,24 @@ total_item <- site_select %>%
 
 top_items <- total_item %>% top_n(10, sum) #show top 20 items total
 
-top_items <- top_items %>%
-           mutate(pct=sum/sum(sum)*100)
+# top_items <- top_items %>%
+#            mutate(pct=sum/sum(sum)*100)
+# 
+# top10items <- top_items %>%
+#   mutate_if(is.numeric, format, digits=0) %>%
+#   kable("html", 
+#       col.names = c("Debris Item", "Sum", "SD", "Percent"),
+#       caption = "Top 10 items across all surveys") %>% 
+#   kable_styling(bootstrap_options="condensed", position="left")
+# top10items #print table
 
-top10items <- top_items %>%
-  mutate_if(is.numeric, format, digits=0) %>%
-  kable("html", 
-      col.names = c("Debris Item", "Sum", "SD", "Percent"),
-      caption = "Top 10 items across all surveys") %>% 
-  kable_styling(bootstrap_options="condensed", position="left")
-top10items #print table
+p_top_items <- 
+  ggplot(top_items, aes(x=sum, y=item_name, colour=Material)) +
+  geom_point() +        
+  geom_segment( aes(x=0, xend=sum, y=item_name, yend=item_name))
+
+
+p_top_items
 ``` 
 ## Top items per habitat type
 Glass bottles and fishing debris were common at both pier and soft sediment sites.  Piers had more metal scraps and fishing adjacent items, whereas soft sediment sites had more soft plastic bags and wrappers.
@@ -216,23 +224,31 @@ top_items_per_ss <- item_total_per_habitat %>%
   top_n(6, sum) #show top 10 items over all sediment sites
 
 #combine the two tables
-top_items_per_habitat <- rbind(top_items_per_pier, top_items_per_ss)
+hab_top_items <- rbind(top_items_per_pier, top_items_per_ss)
 
-#Create pct of total
-top_items_per_habitat <- top_items_per_habitat %>%
-           mutate(pct=sum/sum(sum)*100)
+p_hab_top_items <- 
+  ggplot(top_items, aes(x=sum, y=item, colour=)) +
+  geom_point() +        
+  geom_segment( aes(x=0, xend=sum, y=item, yend=item))
 
-#create kable with both pier and sediment results
-top6items_perHabitat <- top_items_per_habitat %>% 
-  dplyr::select(-Habitat) %>%
-  mutate_if(is.numeric, format, digits=0) %>% #set no decimals
-  kable("html", booktabs = TRUE, #nice format
-      col.names = c("Debris item", "Sum", "SD", "Percent"),
-      caption = "Top 6 items per Habitat Type") %>% 
-      pack_rows(index=c("Pier" = 6, "Sediment"=6)) %>%
-      kable_styling(bootstrap_options="condensed", position="left") 
 
-top6items_perHabitat #display table
+p_hab_top_items
+
+# #Create pct of total
+# top_items_per_habitat <- top_items_per_habitat %>%
+#            mutate(pct=sum/sum(sum)*100)
+# 
+# #create kable with both pier and sediment results
+# top6items_perHabitat <- top_items_per_habitat %>% 
+#   dplyr::select(-Habitat) %>%
+#   mutate_if(is.numeric, format, digits=0) %>% #set no decimals
+#   kable("html", booktabs = TRUE, #nice format
+#       col.names = c("Debris item", "Sum", "SD", "Percent"),
+#       caption = "Top 6 items per Habitat Type") %>% 
+#       pack_rows(index=c("Pier" = 6, "Sediment"=6)) %>%
+#       kable_styling(bootstrap_options="condensed", position="left") 
+# 
+# top6items_perHabitat #display table
 ```
 ## Mean of items by material type per site and habitat
 Plastic is the most prevalent material type in almost every site, the notable exception being Clifton Gardens soft sediment site where glass was most common.
@@ -298,6 +314,11 @@ Sites closer to the harbour mouth demonstrate a higher proportion of fishing rel
 ```{r fishing-setup, warning=FALSE, include=FALSE}
 #Isolate fishing vs non-fishing data
 fishing <- site_select %>%
+  group_by(Fishing) %>% #group by fishing or non-fishing
+  summarise(sum=sum(Total), #total fishing items
+            sd=sd(Total)) 
+
+fishing_loc <- site_select %>%
   group_by(Site, Fishing) %>% #group by fishing or non-fishing
   summarise(sum=sum(Total), #total fishing items
             mean=sum/unique(NumberSurveys),
@@ -315,15 +336,16 @@ site_habitat <- site_select %>%
   dplyr::select(Site, Habitat, Location) %>%
   distinct() #create df for labeling
 
-fishing <- left_join(fishing, site_habitat, by="Site") #join for labeling
+fishing_loc <- left_join(fishing_loc, site_habitat, by="Site") #join for labeling
 
-p_fishing <- fishing %>%
+p_fishing_loc <- fishing_loc %>%
   ggplot( aes(x=Habitat, y=mean, fill=Fishing)) +
   geom_bar(position="dodge", stat="identity") +
   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd, width=0.2), position=position_dodge(width=0.90)) +
-  facet_wrap(~Location, scales = "free_y")
+  facet_wrap(~Location, scales = "free_y") + 
+  scale_fill_grey()
 
-p_fishing
+p_fishing_loc
 
 p_fishing_hab <- fishing_hab %>%
   ggplot( aes(x=Habitat, y=sum, fill=Fishing)) +
@@ -335,6 +357,16 @@ p_fishing_hab <- fishing_hab %>%
   scale_fill_grey()
 
 p_fishing_hab
+
+p_fishing <- fishing %>%
+  ggplot( aes(x=Fishing, y=sum, fill=Fishing)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_errorbar(aes(ymin=sum-sd, ymax=sum+sd, width=0.2), position=position_dodge(width=0.90)) +
+   geom_text(aes(label = sum), position= position_dodge(0.9), vjust = 1.5, color = "white", size = 5) +
+   ylab("Sum of debris items") +
+  scale_fill_grey()
+
+p_fishing
 ```
 # Statistics
 

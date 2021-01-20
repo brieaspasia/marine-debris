@@ -143,73 +143,37 @@ mod_hab <- site_select %>%
   group_by(Date, Location, Habitat, DistKm, Coast) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
-  mutate(Date = as.factor(Date),
-         Location = as.factor(Location),
+  mutate(Location = as.factor(Location),
          Habitat = as.factor(Habitat),
          Coast = as.factor(Coast))
          
+# #Old version
+# #GLM negative binomial with two variables and zero inflation
+# m_hab  <- glmmTMB(Total ~ #Debris count
+#                  Habitat + #predicted by Habitat
+#                    DistKm + #distance from harbour mouth
+#                    Coast +
+#                  (1|Location/Date), #date random effect
+#                family=nbinom(), #negative binomial to deal with count data and zeros
+#                data = mod_hab)
 
-#GLM negative binomial with two variables and zero inflation
 m_hab  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                   DistKm + #distance from harbour mouth
-                   Coast +
-                 (1|Location/Date), #date random effect
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_hab)
 
 # m_hab2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# m_hab3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# m_hab4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# m_hab5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# m_hab6  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# m_hab7  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  #   DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                 Habitat +
+#                 DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_hab)
 
 
-drop1(m_hab, test = "Chisq") #coast is not significant
+drop1(m_hab1, test = "Chisq")
 
-AIC(m_hab1, m_hab2, m_hab3, m_hab4, m_hab5, m_hab6, m_hab7) #but AIC shows less than 2 pts difference with or without coast so choose the model with less terms, but DHARMa dispersion is significant without coast, so keep all three
+AIC(m_hab1, m_hab2, m_hab3, m_hab4) #but AIC shows less than 2 pts difference with or without coast so choose the model with less terms, but DHARMa dispersion is significant without coast, so keep all three
 
 ```
 # Summary - these concepts are important as comparisons between different model fits, but the numbers themselves aren't necessarily important.
@@ -240,7 +204,6 @@ testDispersion(simulationOutput_hab) #tests if the simulated dispersion is equal
 #testQuantiles(simulationOutput_hab) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_hab) #tests if there are more zeros than expected
 
-#plotQQunif(m_hab, testDispersion=FALSE)
 ```
 
 # Plotting model predictions
@@ -256,7 +219,6 @@ nd_hab <- expand.grid(Habitat = unique(mod_hab$Habitat),
                   DistKm = seq(from = min(mod_hab$DistKm),
                                to = max(mod_hab$DistKm),
                                length=1000),
-                  Coast = unique(mod_hab$Coast),
                   Location = NA,
                   Date = NA)
 
@@ -275,9 +237,9 @@ nd_hab$SE_lower <- pred_hab$fit - pred_hab$se.fit
 
 #plot the predicted means
 ggplot(nd_hab, aes(y=Total, x=DistKm)) + 
-  geom_line() +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
-  facet_grid(Coast~Habitat, scales = "free_y")
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+
 ```
 
 

@@ -225,6 +225,9 @@ coefplot(fit_allfixed)
 
 anova(fit_env, fit_allfixed)
 
+summary(fit_allfixed)
+
+?levelplot
 
 ```
 # Latent variables
