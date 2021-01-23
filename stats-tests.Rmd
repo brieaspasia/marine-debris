@@ -146,16 +146,7 @@ mod_hab <- site_select %>%
   mutate(Location = as.factor(Location),
          Habitat = as.factor(Habitat),
          Coast = as.factor(Coast))
-         
-# #Old version
-# #GLM negative binomial with two variables and zero inflation
-# m_hab  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    Coast +
-#                  (1|Location/Date), #date random effect
-#                family=nbinom(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
+
 
 m_hab  <- glmmTMB(Total ~ #Debris count
                  Habitat * DistKm + #predicted by Habitat
@@ -164,16 +155,18 @@ m_hab  <- glmmTMB(Total ~ #Debris count
                data = mod_hab)
 
 # m_hab2  <- glmmTMB(Total ~ #Debris count
-#                 Habitat +
-#                 DistKm + #predicted by Habitat
+#                  Habitat + #predicted by Habitat
 #                  (1|Location) + (1|Date), #date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_hab)
-
-
-drop1(m_hab1, test = "Chisq")
-
-AIC(m_hab1, m_hab2, m_hab3, m_hab4) #but AIC shows less than 2 pts difference with or without coast so choose the model with less terms, but DHARMa dispersion is significant without coast, so keep all three
+# 
+# m_hab3  <- glmmTMB(Total ~ #Debris count
+#                  DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_hab)
+# 
+# AIC(m_hab, m_hab2, m_hab3) #AIC shows m_hab to be the best fit
 
 ```
 # Summary - these concepts are important as comparisons between different model fits, but the numbers themselves aren't necessarily important.
@@ -249,75 +242,35 @@ ggplot(nd_hab, aes(y=Total, x=DistKm)) +
 #create df to use for models
 mod_fish <- site_select %>%
   filter(Fishing=="Fishing") %>% #fishing line
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
-              mutate(Date = as.factor(Date),
-         Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Coast = as.factor(Coast))
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
 m_fish  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat 
-                   DistKm + #predicted by distance from harbour mouth
+                 Habitat * DistKm + #predicted by distance from harbour mouth
                    # Coast + #predicted by north or south coast
-                 (1|Location/Date), #site random effect
+                 (1|Location) + (1|Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_fish) 
 
 # m_fish2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                  Habitat + #predicted by distance from harbour mouth
+#                    # Coast + #predicted by north or south coast
+#                  (1|Location) + (1|Date), #site random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_fish) 
 # 
 # m_fish3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                  DistKm + #predicted by distance from harbour mouth
+#                    # Coast + #predicted by north or south coast
+#                  (1|Location) + (1|Date), #site random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_fish) 
 # 
-# m_fish4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_fish) 
-# 
-# m_fish5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_fish) 
-# 
-# m_fish6  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_fish) 
-# 
-# m_fish7  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  #   DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_fish) 
-
-#Testing which variables are significant
-drop1(m_fish, test = "Chisq") #decision to drop coast from the model
-
-AIC(m_fish, m_fish2, m_fish3, m_fish4, m_fish5, m_fish6, m_fish7) #but AIC shows less than 2 pts difference with or without coast so choose the model with less terms
+# AIC(m_fish, m_fish2, m_fish3) #m_fish is the best fit
 
 ```
 
@@ -360,9 +313,8 @@ nd_fish$SE_upper <- pred_fish$fit + pred_fish$se.fit
 nd_fish$SE_lower <- pred_fish$fit - pred_fish$se.fit
 
 ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
-  geom_line() +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
-  facet_grid(~Habitat, scales = "free_y") 
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2)
 ```
 
 
@@ -371,73 +323,32 @@ ggplot(nd_fish, aes(y=Total, x=DistKm)) +
 #create df to use for models
 mod_nonfish <- site_select %>%
   filter(Fishing=="Non-Fishing") %>% #nonfishing debris
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
-              mutate(Date = as.factor(Date),
-         Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Coast = as.factor(Coast))
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
+# m_nonfish1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat * DistKm + #predicted by Habitat 
+#                  (1|Location) + (1|Date), #site random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_nonfish) 
+
 m_nonfish  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat 
-                 (1|Location/Date), #site random effect
+                 (1|Location) + (1|Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_nonfish) 
 
-# m_nonfish2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
-# 
 # m_nonfish3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
-# 
-# m_nonfish4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
-# 
-# m_nonfish5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
-# 
-# m_nonfish6  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
-# 
-# m_nonfish7  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  #   DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                  DistKm + #predicted by Habitat 
+#                  (1|Location) + (1|Date), #site random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_nonfish) 
 
-drop1(m_nonfish, test = "Chisq") #decision to drop coast and distKM from the model
-
-AIC(m_nonfish, m_nonfish2, m_nonfish3, m_nonfish4, m_nonfish5, m_nonfish6, m_nonfish7) #but AIC shows less than 2 pts difference without coast and DistKm, so keep just Habitat
-
+# AIC(m_nonfish1, m_nonfish, m_nonfish3) #Habitat is the only significant in nonfishing debris
 ```
 
 ```{r model-summary-nonfish}
@@ -456,6 +367,8 @@ testDispersion(simulationOutput_nonfish) #tests if the simulated dispersion is e
 testQuantiles(simulationOutput_nonfish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(simulationOutput_nonfish) #tests if there are more zeros than expected
 ```
+
+
 ```{r nonfish-predict-setup}
 
 # Predictors for non-fishing related debris are: Habitat
@@ -477,9 +390,8 @@ nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
 
 
 ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
-  geom_col() +
+  geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
-
 ```
 
 ## Testing fishing line debris type
@@ -488,73 +400,32 @@ ggplot(nd_nonfish, aes(y=Total, x=Habitat)) +
 #create df of fishing line to use for models
 mod_F2 <- site_select %>%
   filter(ID=="F2") %>% #fishing line
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
-              mutate(Date = as.factor(Date),
-         Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Coast = as.factor(Coast))
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
 m_F2  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                   DistKm + #distance from harbour mouth
-                 (1|Location/Date), #site random effect
+                 Habitat * DistKm + #distance from harbour mouth
+                 (1|Location) + (1|Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_F2) 
 
 # m_F22  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                  Habitat + #distance from harbour mouth
+#                  (1|Location) + (1|Date), #site random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2)
+#                data = mod_F2) 
 # 
 # m_F23  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                  DistKm + #distance from harbour mouth
+#                  (1|Location) + (1|Date), #site random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2)
+#                data = mod_F2) 
 # 
-# m_F24  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2)
-# 
-# m_F25  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2)
-# 
-# m_F26  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2)
-# 
-# m_F27  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  #   DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2)
-
-drop1(m_F2, test = "Chisq") #decision to drop coast from the model
-
-# AIC(m_F2, m_F22, m_F23, m_F24, m_F25, m_F26, m_F27) #AIC shows less than 2 pts difference without coast, so use habitat+distkm to keep less variables
+# AIC(m_F2, m_F22, m_F23) #AIC shows m_F2 is best fit
 
 ```
 
@@ -599,82 +470,41 @@ nd_F2$SE_lower <- pred_F2$fit - pred_F2$se.fit
 #plot the predicted means
 
 ggplot(nd_F2, aes(y=Total, x=DistKm)) +
-  geom_line() +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
-  facet_grid(~Habitat, scales = "free_y")
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2)
 ```
 ## Testing hooks/sinkers debris type
 ```{r glm-hook, warning=FALSE, message=FALSE}
 #create df of fishing hooks/sinkers to use for models
 mod_hook <- site_select %>%
   filter(ID=="F6") %>% #fishhooks and sinkers
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
-              mutate(Date = as.factor(Date),
-         Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Coast = as.factor(Coast))
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
+# m_hook1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat * DistKm +
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_hook) 
+
 m_hook  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                   DistKm +
-                 (1|Location/Date), #site/date random effect
+                 Habitat +
+                 (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_hook) 
 
-# m_hook2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook)
-# 
 # m_hook3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
+#                  DistKm +
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook)
-# 
-# m_hook4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook)
-# 
-# m_hook5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    # DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook)
-# 
-# m_hook6  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                    DistKm + #distance from harbour mouth
-#                    # Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook)
-# 
-# m_hook7  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  #   DistKm + #distance from harbour mouth
-#                    Coast + #north or south coast
-#                  (1|Location/Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook)
+#                data = mod_hook) 
 
-drop1(m_hook, test = "Chisq") #decision to drop coast from the model
 
-# AIC(m_hook, m_hook2, m_hook3, m_hook4, m_hook5, m_hook6, m_hook7) #AIC shows less than 2 pts difference without coast, so use habitat+distkm to keep less variables
+# AIC(m_hook1, m_hook2, m_hook3) #just use habitat as its the simpler model and less than 1 AIC difference than using DistKm too.
 
 ```
 
@@ -701,9 +531,6 @@ testZeroInflation(simulationOutput_hook) #tests if there are more zeros than exp
 # Predictors are: Habitat, DistKm
 
 nd_hook <- expand.grid(Habitat = unique(mod_hook$Habitat),
-                          DistKm = seq(from = min(mod_hook$DistKm),
-                               to = max(mod_hook$DistKm),
-                               length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -719,75 +546,43 @@ nd_hook$SE_lower <- pred_hook$fit - pred_hook$se.fit
 
 #plot the predicted means
 
-ggplot(nd_hook, aes(y=Total, x=DistKm)) +
-  geom_line() +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
-  facet_grid(~Habitat, scales = "free_y")
+ggplot(nd_hook, aes(y=Total, x=Habitat)) +
+  geom_col(aes(fill=Habitat)) +
+  geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower, width=0.2), 
+  position=position_dodge(width=0.90))
 ```
 ## Testing glass bottles debris type
 ```{r glm-btl, warning=FALSE, message=FALSE}
 #create df of glass bottles to use for models
 mod_btl <- site_select %>%
   filter(ID=="G1") %>% #glass bottles
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
-              mutate(Date = as.factor(Date),
-         Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Coast = as.factor(Coast))
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
+# m_btl1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat*DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_btl)
+
 m_btl  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
-                 (1|Location/Date), #site/date random effect
+                 (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_btl)
 
-# m_btl2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm +
-#                    # Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-# 
 # m_btl3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                   #DistKm + 
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
+#                  DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_btl)
 # 
-# m_btl4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
 # 
-# m_btl5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-# 
-# m_btl6  <- glmmTMB(Total ~ #Debris count
-#                  DistKm +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-# 
-# m_btl7  <- glmmTMB(Total ~ #Debris count
-#                  Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-
-drop1(m_btl, test = "Chisq") #decision to drop distKM + Coast from the model
-# AIC(m_btl, m_btl2, m_btl3, m_btl4, m_btl5, m_btl6, m_btl7) #testing either dist, coast, with both, without both
+# AIC(m_btl1, m_btl, m_btl3) #keep habitat only
 
 ```
 
@@ -831,7 +626,7 @@ nd_btl$SE_lower <- pred_btl$fit - pred_btl$se.fit
 #plot the predicted means
 
 ggplot(nd_btl, aes(y=Total, x=Habitat)) +
-  geom_col() +
+  geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
 ```
 
@@ -893,62 +688,30 @@ mod_hab$resid = resid(m_hab) #create a column for each survey event's residuals
 #create df of all plastic materials
 mod_plas <- site_select %>%
   filter(Material=="Plastic") %>% 
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
 #GLM negative binomial with two variables and zero inflation
 m_plas  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                   DistKm + 
-                 (1|Location/Date), #site/date random effect
+                 Habitat*DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_plas) 
 
 # m_plas2  <- glmmTMB(Total ~ #Debris count
 #                  Habitat + #predicted by Habitat
-#                    DistKm +
-#                    # Coast +
-#                  (1|Location/Date), #site/date random effect
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas)
+#                data = mod_plas) 
 # 
 # m_plas3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                   #DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
+#                  DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas)
+#                data = mod_plas) 
 # 
-# m_plas4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas)
 # 
-# m_plas5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas)
-# 
-# m_plas6  <- glmmTMB(Total ~ #Debris count
-#                  DistKm +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas)
-# 
-# m_plas7  <- glmmTMB(Total ~ #Debris count
-#                  Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas)
-
-drop1(m_plas, test = "Chisq") #decision to drop coast from the model
-
-# AIC(m_plas, m_plas2, m_plas3, m_plas4, m_plas5, m_plas6, m_plas7) #testing either dist, coast, with both, without both
+# AIC(m_plas, m_plas2, m_plas3) #keep Habitat * DistKm
 
 ```
 
@@ -994,72 +757,37 @@ nd_plas$SE_lower <- pred_plas$fit - pred_plas$se.fit
 #plot the predicted means
 
 ggplot(nd_plas, aes(y=Total, x=DistKm)) +
-  geom_line() +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
-  facet_grid(~Habitat, scales = "free_y")
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2)
 ```
 
 ```{r glm-othermat, warning=FALSE, message=FALSE}
 #create df of all misc materials
 mod_oth <- site_select %>%
   filter(Material=="Other") %>% #rubber, cloth, e-waste, ceramic, timber, bricks, etc
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
-#GLM negative binomial with two variables and zero inflation
+# #GLM negative binomial with two variables and zero inflation
+# m_oth1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat*DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_oth)
+
 m_oth  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
-                 Coast + #predicted by aspect
-                   DistKm + 
-                 (1|Location/Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom2(), #negative binomial to deal with count data and zeros
                data = mod_oth)
-# 
-# m_oth2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm +
-#                    # Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-# 
+
 # m_oth3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                   #DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
+#                  DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_oth)
 # 
-# m_oth4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-# 
-# m_oth5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-# 
-# m_oth6  <- glmmTMB(Total ~ #Debris count
-#                  DistKm +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-# 
-# m_oth7  <- glmmTMB(Total ~ #Debris count
-#                  Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-
-# AIC(m_oth, m_oth2, m_oth3, m_oth4, m_oth5, m_oth6, m_oth7) #testing either dist, coast, with both, without both
-
-drop1(m_oth, test = "Chisq") #decision to drop distKM from the model
+# AIC(m_oth1, m_oth, m_oth3) #testing either dist, coast, with both, without both
 
 ```
 
@@ -1086,10 +814,6 @@ testZeroInflation(simulationOutput_oth) #tests if there are more zeros than expe
 # Predictors for 'other' materials are: Habitat, Coast
 
 nd_oth <- expand.grid(Habitat = unique(mod_oth$Habitat),
-                         Coast = unique(mod_oth$Coast),
-                      DistKm = seq(from = min(mod_plas$DistKm),
-                               to = max(mod_plas$DistKm),
-                               length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -1105,70 +829,38 @@ nd_oth$SE_lower <- pred_oth$fit - pred_oth$se.fit
 
 #plot the predicted means
 
-ggplot(nd_oth, aes(y=Total, x=DistKm)) +
-  geom_line() +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) + facet_grid(Coast~Habitat, scales = "free_y")
+ggplot(nd_oth, aes(y=Total, x=Habitat)) +
+  geom_col(aes(fill=Habitat)) +
+  geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower, width=0.2), position=position_dodge(width=0.90))
 ```
 
 ```{r glm-glsmat, warning=FALSE, message=FALSE}
 #create df of all misc materials
 mod_gls <- site_select %>%
   filter(Material=="Glass") %>% #glass
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
-#GLM negative binomial with two variables and zero inflation
+# #GLM negative binomial with two variables and zero inflation
+# m_gls1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat*DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_gls)
+
 m_gls  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
-                 (1|Location/Date), #site/date random effect
+                 (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_gls)
 
-# m_gls2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm +
-#                    # Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-# 
 # m_gls3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                   #DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
+#                  DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_gls)
 # 
-# m_gls4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-# 
-# m_gls5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-# 
-# m_gls6  <- glmmTMB(Total ~ #Debris count
-#                  DistKm +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-# 
-# m_gls7  <- glmmTMB(Total ~ #Debris count
-#                  Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-
-# AIC(m_gls, m_gls2, m_gls3, m_gls4, m_gls5, m_gls6, m_gls7) #testing either dist, coast, with both, without both
-
-drop1(m_gls, test = "Chisq") #decision to drop distKM from the model
+# AIC(m_gls1, m_gls, m_gls3) #keep just habitat
 
 ```
 
@@ -1212,69 +904,36 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 #plot the predicted means
 
 ggplot(nd_gls, aes(y=Total, x=Habitat)) +
-  geom_col() +
+  geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
 ```
 ```{r glm-metmat, warning=FALSE, message=FALSE}
 #create df of all misc materials
 mod_met <- site_select %>%
   filter(Material=="Metal") %>% #glass
-  group_by(Date, Location, Habitat, Coast, DistKm) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) 
 
-#GLM negative binomial with two variables and zero inflation
+# #GLM negative binomial with two variables and zero inflation
+# m_met1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat*DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_met)
+
 m_met  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
-                 (1|Location/Date), #site/date random effect
+                 (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_met)
 
-# m_met2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                    DistKm +
-#                    # Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
-# 
 # m_met3  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                   #DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
+#                  DistKm + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
 #                data = mod_met)
 # 
-# m_met4  <- glmmTMB(Total ~ #Debris count
-#                  # Habitat + #predicted by Habitat
-#                  DistKm +
-#                  Coast + #predicted by aspect
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
-# 
-# m_met5  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
-# 
-# m_met6  <- glmmTMB(Total ~ #Debris count
-#                  DistKm +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
-# 
-# m_met7  <- glmmTMB(Total ~ #Debris count
-#                  Coast +
-#                  (1|Location/Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
-
-# AIC(m_met, m_met2, m_met3, m_met4, m_met5, m_met6, m_met7) #testing either dist, coast, with both, without both
-
-drop1(m_met, test = "Chisq") #decision to drop distKM from the model
-
+# AIC(m_met1, m_met2, m_met3) #habitat alone is simplest model with almost lowest AIC
 ```
 
 
@@ -1317,7 +976,7 @@ nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
 #plot the predicted means
 
 ggplot(nd_met, aes(y=Total, x=Habitat)) +
-  geom_col() +
+  geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
 ```
 ```{r tidy-models}
