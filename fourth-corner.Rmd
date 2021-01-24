@@ -99,7 +99,7 @@ site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEn
 
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
+  dplyr::select(Site, CostDis) %>% #select only distance to harbour mouth for join
   mutate(DistKm = CostDis/100) #distance to harbour mouth
   
 #join distance to mouth to main dataset
@@ -137,7 +137,7 @@ Creating dataframes for abundance of debris types, environmental variables, and 
       group_by(survey_event) %>%
       mutate(sum=sum(Total)) %>%
       filter(sum>0) %>%
-      dplyr::select(survey_event, Habitat, DistKm, Coast) %>%
+      dplyr::select(survey_event, Habitat, DistKm) %>%
       distinct()
     
   #convert survey event to rowname
@@ -146,9 +146,9 @@ Creating dataframes for abundance of debris types, environmental variables, and 
   #convert Habitat to numeric
   env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
   env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
-  #convert Coast to numeric
-  env$Coast <- as.factor(env$Coast) #convert character to factor with 2 levels
-  env$Coast <- as.numeric(env$Coast) #convert factor to numeric
+  # #convert Coast to numeric
+  # env$Coast <- as.factor(env$Coast) #convert character to factor with 2 levels
+  # env$Coast <- as.numeric(env$Coast) #convert factor to numeric
 
 #Traits
   
@@ -213,13 +213,13 @@ Coefficient plot shows estimated coefficients (ticks) and their 95% confidence i
 ```{r model-long}
 #model with environmental variables as predictors
 fit_env <- gllvm(y, X, family="negative.binomial", 
-                 formula = y ~ (0 + Coast + DistKm + Habitat))
+                 formula = y ~ (0 + DistKm + Habitat))
 coefplot(fit_env)
 
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
-                      formula = y ~ (0 + Habitat + DistKm + Coast) + 
-                        (Habitat + DistKm + Coast) : (Material + Dispersiveness + Fishing),
+                      formula = y ~ (0 + Habitat + DistKm) + 
+                        (Habitat + DistKm) : (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
 coefplot(fit_allfixed)
 
