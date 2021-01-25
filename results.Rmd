@@ -196,6 +196,7 @@ p_top_items <-
 
 
 p_top_items
+
 ``` 
 ## Top items per habitat type
 Glass bottles and fishing debris were common at both pier and soft sediment sites.  Piers had more metal scraps and fishing adjacent items, whereas soft sediment sites had more soft plastic bags and wrappers.
