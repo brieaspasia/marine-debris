@@ -166,7 +166,7 @@ The most common item across all surveys was fishing line, at nearly 60% of the t
 ```{r top-items, fig.cap="Table 1: Top ten debris types across all surveys"}
 #Find the top item types across all surveys
 total_item <- site_select %>%
-  group_by(Material, item_name) %>%
+  group_by(Habitat, item) %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
         dplyr::select(item, sum, sd) %>% #remove irrelevant columns
@@ -176,7 +176,7 @@ total_item <- site_select %>%
 
 # total_item <- left_join(total_item, item_code, by="ID") #join item names
 
-top_items <- total_item %>% top_n(10, sum) #show top 20 items total
+top_items <- total_item %>% top_n(20, sum) #show top 20 items total
 
 # top_items <- top_items %>%
 #            mutate(pct=sum/sum(sum)*100)
@@ -190,9 +190,9 @@ top_items <- total_item %>% top_n(10, sum) #show top 20 items total
 # top10items #print table
 
 p_top_items <- 
-  ggplot(top_items, aes(x=sum, y=item_name, colour=Material)) +
+  ggplot(top_items, aes(x=sum, y=item)) +
   geom_point() +        
-  geom_segment( aes(x=0, xend=sum, y=item_name, yend=item_name))
+  geom_segment( aes(x=0, xend=sum, y=item, yend=item))
 
 
 p_top_items
@@ -217,11 +217,11 @@ item_total_per_habitat <- site_select %>%
 
 top_items_per_pier <- item_total_per_habitat %>% 
   filter(Habitat=="P") %>%
-  top_n(6, sum) #show top 10 items over all piers
+  top_n(10, sum) #show top 10 items over all piers
 
 top_items_per_ss <- item_total_per_habitat %>% 
   filter(Habitat=="SS") %>%
-  top_n(6, sum) #show top 10 items over all sediment sites
+  top_n(10, sum) #show top 10 items over all sediment sites
 
 #combine the two tables
 hab_top_items <- rbind(top_items_per_pier, top_items_per_ss)
