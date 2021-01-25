@@ -166,7 +166,7 @@ The most common item across all surveys was fishing line, at nearly 60% of the t
 ```{r top-items, fig.cap="Table 1: Top ten debris types across all surveys"}
 #Find the top item types across all surveys
 total_item <- site_select %>%
-  group_by(Habitat, item) %>%
+  group_by(item) %>%
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
         dplyr::select(item, sum, sd) %>% #remove irrelevant columns
@@ -176,7 +176,7 @@ total_item <- site_select %>%
 
 # total_item <- left_join(total_item, item_code, by="ID") #join item names
 
-top_items <- total_item %>% top_n(20, sum) #show top 20 items total
+top_items <- total_item %>% top_n(22, sum) #show top 20 items total
 
 # top_items <- top_items %>%
 #            mutate(pct=sum/sum(sum)*100)
@@ -204,7 +204,7 @@ Glass bottles and fishing debris were common at both pier and soft sediment site
 ```{r top-items-per-habitat, fig.cap="Table 2: Top ten debris items per habitat"}
 #top items per habitat
 item_total_per_habitat <- site_select %>%
-  group_by(Habitat, item) %>% #separate the items by habitat type
+  group_by(Habitat, Material, item_name, item) %>% #separate the items by habitat type
   mutate(sum=sum(Total), #sum of total items by type
          sd=sd(Total)) %>% #sd of total items by type
         dplyr::select(item, Habitat, sum, sd)%>% #remove irrelevant columns
@@ -228,7 +228,7 @@ top_items_per_ss <- item_total_per_habitat %>%
 hab_top_items <- rbind(top_items_per_pier, top_items_per_ss)
 
 p_hab_top_items <- 
-  ggplot(top_items, aes(x=sum, y=item, colour=)) +
+  ggplot(hab_top_items, aes(x=sum, y=item, colour=Material)) +
   geom_point() +        
   geom_segment( aes(x=0, xend=sum, y=item, yend=item))
 
@@ -251,6 +251,31 @@ p_hab_top_items
 # 
 # top6items_perHabitat #display table
 ```
+
+```{r top-items-lollipop}
+top_lol <- site_select
+
+#state variables to rename
+top20 <- c("F2", "F6", "G1", "M10", "F7", "Z2", "Z5", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4", "S7", "H6") 
+
+top_lol <- top_lol %>%
+  filter(ID %in% top20) %>%
+  group_by(Habitat, ID, item_name) %>%
+  summarise(sum=sum(Total)) 
+
+#how to change this so that 
+
+p_top_lol <- top_lol %>%
+  mutate(item_name=fct_reorder(item_name, sum)) %>%
+  ggplot( aes(x=sum, y=item_name)) +
+  geom_point( aes(colour=Habitat)) +        
+  geom_segment( aes(x=0, xend=sum, y=item_name, yend=item_name))
+
+
+p_top_lol
+
+```
+
 ## Mean of items by material type per site and habitat
 Plastic is the most prevalent material type in almost every site, the notable exception being Clifton Gardens soft sediment site where glass was most common.
 ```{r material-setup, warning=FALSE, include=FALSE}

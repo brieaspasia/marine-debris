@@ -20,6 +20,7 @@ library(lattice) #fourth corner heatmap
 library(corrplot) #co-occurrence matrix
 library(gclus) #co-occurrence matrix
 library(broom.mixed) #regression tables
+library(grDevices) #colour palattes for ordiplot
 
 #Tutorial
 #https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
@@ -137,7 +138,7 @@ Creating dataframes for abundance of debris types, environmental variables, and 
       group_by(survey_event) %>%
       mutate(sum=sum(Total)) %>%
       filter(sum>0) %>%
-      dplyr::select(survey_event, Habitat, DistKm) %>%
+      dplyr::select(survey_event, Habitat, DistKm, Location) %>%
       distinct()
     
   #convert survey event to rowname
@@ -146,9 +147,9 @@ Creating dataframes for abundance of debris types, environmental variables, and 
   #convert Habitat to numeric
   env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
   env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
-  # #convert Coast to numeric
-  # env$Coast <- as.factor(env$Coast) #convert character to factor with 2 levels
-  # env$Coast <- as.numeric(env$Coast) #convert factor to numeric
+  # #convert Location to numeric
+  env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
+  env$Location <- as.numeric(env$Location) #convert factor to numeric
 
 #Traits
   
@@ -218,8 +219,8 @@ coefplot(fit_env)
 
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
-                      formula = y ~ (Habitat + DistKm) + 
-                        (Habitat + DistKm) * (Material + Dispersiveness + Fishing),
+                      formula = y ~ (Habitat + DistKm + Location) + 
+                        (Habitat + DistKm + Location) * (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
 coefplot(fit_allfixed)
 
@@ -234,23 +235,43 @@ summary(fit_allfixed)
 The latent variables in gllvm would be correlation between types of rubbish (where you either have rubbish type as a categorical predictor or as separate columns in the response matrix). You would expect e.g. correlation between types of rubbish that may be generated from similar activities- e.g. beach parties, fishing etc. e.g. bottles and bottle caps and plastic wrappers may have a relationship, all coming from beach parties. Correlation can also come from missing predictors in the model. -- Eve
 ```{r latent-variables}
 #biplot - clusters of debris items with numbers representing sites
-ordiplot(fit_allfixed, biplot=TRUE)
+pchr = NULL
+pchr[env$Habitat == "1"] = 1
+pchr[env$Habitat == "2"] = 2
+
+dis <- env$DistKm
+rbPal <- colorRampPalette(c('mediumspringgreen', 'blue'))
+Colorsph <- rbPal(20)[as.numeric(cut(dis, breaks = 100))]
+breaks <- seq(min(dis), max(dis), length.out = 30)
+
+ordiplot(fit_allfixed, biplot=TRUE, symbols=TRUE, pch=pchr, s.colors = Colorsph)
+legend("topleft", legend = c("Pier", "Sediment"), pch = c(1, 2), bty = "n") #not working like in the vignette
+
+#refer to https://cran.r-project.org/web/packages/gllvm/vignettes/vignette2.html
+
+
+
 
 fit_env <- gllvm(y, X, family="negative.binomial") #abundance + env traits
 cr <- getResidualCor(fit_env) #residual correlation matrix
 
-cr_test <- cr[c(1,4),c(1,4)] #subset row, column
-corrplot(cr_test[order.single(cr_test),
-            order.single(cr_test)],
+#subsetting top 20 debris types
+cr_subset <- cr[c(3,5,6,10,11,13,14,15,17,19,28,46,48,52,56,58,59,60),c(3,5,6,10,11,13,14,15,17,19,28,46,48,52,56,58,59,60)] #subset row, column
+
+
+corrplot(cr_subset[order.single(cr_subset),
+            order.single(cr_subset)],
          diag=FALSE, #whether display coefs on the principal diagonal
          type="lower", #displays lower triangle matrix
          method="circle", #visualization method
          tl.cex = 0.5, tl.srt=45, tl.col="red")
 
+#reference https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
+
 
 #correlation matrix for debris types
-corrplot(cr[order.single(cr),
-            order.single(cr)],
+corrplot(cr[order.single(cr_subset),
+            order.single(cr_subset)],
          diag=FALSE, #whether display coefs on the principal diagonal
          type="lower", #displays lower triangle matrix
          method="circle", #visualization method
