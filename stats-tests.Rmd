@@ -37,6 +37,7 @@ library(lattice) #fourth corner heatmap
 library(corrplot) #co-occurrence matrix
 library(gclus) #co-occurrence matrix
 library(broom.mixed) #regression tables
+library(vegan) #ordination
 
 library(sjPlot) #regression models as HTML table
 library(sjmisc) #regression models as HTML table
@@ -140,12 +141,11 @@ Debris type is not considered as a random effect because in this instance it is 
 ```{r glm-hab, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_hab <- site_select %>%
-  group_by(Date, Location, Habitat, DistKm, Coast) %>% #relevant variables
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
   mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Coast = as.factor(Coast))
+         Habitat = as.factor(Habitat))
 
 
 m_hab  <- glmmTMB(Total ~ #Debris count
@@ -1061,4 +1061,48 @@ tab_model(
           string.ci = "Conf. Int (95%)"
 )
 ```
+
+```{r vegan}
+browseVignettes("vegan")
+
+data(dune)
+
+ord_vignette <- decorana(dune)
+plot(ord_vignette)
+
+ord_mds <- metaMDS(dune)
+
+plot(ord_mds)
+
+#Abundance data
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+   # filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4")) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+  
+  ord <- decorana(abund)
+  plot(ord)
+
+plot(ord, type = "n")
+points(ord, display = "sites", cex = 0.8, pch=21, col="red", bg="yellow")
+text(ord, display = "spec", cex=0.7, col="blue")
+
+```
+
 

@@ -233,14 +233,14 @@ summary(fit_allfixed)
 ```
 # Latent variables
 The latent variables in gllvm would be correlation between types of rubbish (where you either have rubbish type as a categorical predictor or as separate columns in the response matrix). You would expect e.g. correlation between types of rubbish that may be generated from similar activities- e.g. beach parties, fishing etc. e.g. bottles and bottle caps and plastic wrappers may have a relationship, all coming from beach parties. Correlation can also come from missing predictors in the model. -- Eve
-```{r latent-variables}
+```{r ordplot}
 #biplot - clusters of debris items with numbers representing sites
 pchr = NULL
-pchr[env$Habitat == "1"] = 1
-pchr[env$Habitat == "2"] = 2
+pchr[env$Habitat == "1"] = 1 #circle pier
+pchr[env$Habitat == "2"] = 2 #triangle sediment
 
 dis <- env$DistKm
-rbPal <- colorRampPalette(c('mediumspringgreen', 'blue'))
+rbPal <- colorRampPalette(c('mediumspringgreen', 'blue')) #green closer, blue further
 Colorsph <- rbPal(20)[as.numeric(cut(dis, breaks = 100))]
 breaks <- seq(min(dis), max(dis), length.out = 30)
 
@@ -248,10 +248,10 @@ ordiplot(fit_allfixed, biplot=TRUE, symbols=TRUE, pch=pchr, s.colors = Colorsph)
 legend("topleft", legend = c("Pier", "Sediment"), pch = c(1, 2), bty = "n") #not working like in the vignette
 
 #refer to https://cran.r-project.org/web/packages/gllvm/vignettes/vignette2.html
+```
 
 
-
-
+```{r corrplot}
 fit_env <- gllvm(y, X, family="negative.binomial") #abundance + env traits
 cr <- getResidualCor(fit_env) #residual correlation matrix
 

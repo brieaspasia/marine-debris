@@ -253,7 +253,11 @@ p_hab_top_items
 ```
 
 ```{r top-items-lollipop}
-top_lol <- site_select
+top_lol <- site_select 
+
+top_lol$ID <- as.factor(top_lol$ID)
+
+str(top_lol)
 
 #state variables to rename
 top20 <- c("F2", "F6", "G1", "M10", "F7", "Z2", "Z5", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4", "S7", "H6") 
@@ -263,13 +267,13 @@ top_lol <- top_lol %>%
   group_by(Habitat, ID, item_name) %>%
   summarise(sum=sum(Total)) 
 
-#how to change this so that 
+HabitatLabs <- c(P = "Pier", SS = "Sediment")
 
 p_top_lol <- top_lol %>%
-  mutate(item_name=fct_reorder(item_name, sum)) %>%
+  mutate(ID=fct_reorder(ID, sum)) %>%
   ggplot( aes(x=sum, y=item_name)) +
   geom_point( aes(colour=Habitat)) +        
-  geom_segment( aes(x=0, xend=sum, y=item_name, yend=item_name))
+  geom_segment( aes(x=0, xend=sum, y=item_name, yend=item_name, colour=Habitat))
 
 
 p_top_lol
