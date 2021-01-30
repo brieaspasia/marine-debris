@@ -1075,19 +1075,21 @@ ord_mds <- metaMDS(dune)
 plot(ord_mds)
 
 #Abundance data
+  #Filter for top items
+site_select_top20 <- site_select %>%
+filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4"))
+
   #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select %>%
+  abund_long <- site_select_top20 %>%
     mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, ID) %>% 
+    group_by(survey_event, Location, Habitat, Date, Label) %>% 
     summarise(sum=sum(Total)) %>% #total of each item type per survey event
-    dplyr::select(survey_event, ID, sum) %>%
-  group_by(ID) %>%
-   # filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4")) %>%
+  group_by(Label) %>%
   filter(sum>0) %>% #filter IDs that have no values across all surveys
   ungroup()
   
   #convert to data wide
-  abund <- spread(abund_long, ID, sum) 
+  abund <- spread(abund_long, Label, sum) 
   
   #replace na values with 0
   abund[is.na(abund)] <- 0
@@ -1096,13 +1098,40 @@ plot(ord_mds)
   length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
   abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
   
-  ord <- decorana(abund)
+  ord <- metaMDS(abund_community)
   plot(ord)
 
 plot(ord, type = "n")
 points(ord, display = "sites", cex = 0.8, pch=21, col="red", bg="yellow")
 text(ord, display = "spec", cex=0.7, col="blue")
 
+```
+```{r MDS-tut}
+#reference http://environmentalcomputing.net/multidimensional-scaling/
+
+#df with only abundance
+abund_community <- abund[5:22]
+
+#create a dissimilarity matrix that measures similarity between every pair of samples
+abund_community.mds <- metaMDS(comm = abund_community, distance = "bray", trace = FALSE, autotransform = FALSE)
+
+#create MDS ordination plot
+plot(abund_community.mds$points)
+
+#extract x-y coords to new df
+MDS_xy <- data.frame(abund_community.mds$points)
+
+#add habitat and location to these coordinates
+MDS_xy$Habitat <- abund$Habitat
+MDS_xy$Location <- abund$Location
+
+
+ggplot(MDS_xy, aes(MDS1, MDS2, color = Habitat)) + geom_point() + theme_bw()
+
+#not greater than 0.2
+abund_community.mds$stress
+
+#see https://rdrr.io/bioc/limma/man/plotMDS.html for symbology
 ```
 
 
