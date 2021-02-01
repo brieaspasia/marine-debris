@@ -259,34 +259,59 @@ top_lol <- site_select
 #state variables to rename
 top20 <- c("F2", "F6", "G1", "M10", "F7", "Z2", "Z5", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4", "S7", "H6") 
 
-top_lol <- top_lol %>%
+get_mean <- site_select %>%
+  filter(ID %in% top20) %>%
+  group_by(Habitat, Label) %>%
+  summarise(sum=sum(Total)) %>%
+  spread(Habitat, sum) %>%
+  rowwise() %>% 
+  mutate( mean = mean(c(P,SS) ))
+
+top_lol <- site_select %>%
   filter(ID %in% top20) %>%
   group_by(Habitat, ID, Label) %>%
-  summarise(sum=sum(Total)) 
-
-x$name <- factor(x$name, levels = x$name[order(x$val)])
-top_lol$sum <- as.numeric(top_lol$sum)
-top_lol$Label <- factor(top_lol$Label, levels = top_lol$Label[order(top_lol$sum)])
-
-
-
-top_lol$ID <- reorder(top_lol$ID, top_lol$sum)
+  summarise(sum=sum(Total)) %>%
+  left_join( get_mean, by="Label") %>%
+  mutate(Label=as.factor(Label),
+  Label=fct_reorder( Label, mean, .desc=TRUE)) %>%
+  ungroup()
 
 HabitatLabs <- c(P = "Pier", SS = "Sediment")
+top_lol$Habitat[top_lol$Habitat == "P"] <-"Pier"
+top_lol$Habitat[top_lol$Habitat == "SS"] <-"Sediment"
 
-str(top_lol)
+# p_top_lol <- top_lol %>%
+#   mutate(Label=as.factor(Label),
+#   Label=fct_reorder(Label, desc(mean))) %>%
+#   ggplot() +
+#   geom_segment( aes(x=SS, xend=P, y=Label, yend=Label), colour="grey") +
+#   geom_point( aes(x=SS, y=Label), color="red", size=2) +
+#   geom_point( aes(x=P, y=Label), color="blue", size=2) +
+#   scale_x_log10() +
+#    labs(title="Most abundant debris items",
+#        subtitle="Total counts by habitat (log10)",
+#        x="Total count", y="Debris item types", tag="C") +
+#   # theme(legend.title=element_blank(), labels=HabitatLabs) +
+#   # guides(fill = guide_legend(title = "Habitat")) +
+#   theme_minimal()
 
-p_top_lol <- top_lol %>%
+p_top_lol <- top_lol %>% 
+  ungroup() %>%
   mutate(Label=as.factor(Label),
-    Label=fct_reorder(Label, sum, .desc=TRUE)) %>%
+  Label=fct_reorder(Label, mean)) %>%
+  dplyr::select(-P, -SS) %>%
   ggplot( aes(x=sum, y=Label)) +
   scale_x_log10() +
-  geom_point( aes(colour=Habitat)) +        
-  geom_segment( aes(x=0, xend=sum, y=Label, yend=Label, colour=Habitat)) +
-
+  geom_linerange( aes(xmin=0, xmax=sum, y=Label, colour=Habitat), position=position_dodge(.5)) +
+  geom_point( aes(colour=Habitat), position=position_dodge(.5), size=2) +
+   labs(title="Most abundant debris items",
+       subtitle="Total counts by habitat (log10)",
+       x="Total count", y="Debris item types", tag="C") +
+  theme_minimal()
 
 p_top_lol
 
+ggsave(filename = "images/p_toplol.pdf", plot = p_top_lol, device="pdf")
 ```
 
 ## Mean of items by material type per site and habitat

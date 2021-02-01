@@ -86,6 +86,8 @@ site_select <- left_join(site_select, sampling_dates, by="Location")
 
 site_select <- site_select %>%
   mutate(survey_event = paste(Date, Site,sep=" "))
+
+HabitatLabs <- c(P = "Pier", SS = "Sediment")
 ```
 
 # Debris Types
@@ -114,6 +116,7 @@ site_select$Material <- as.character(site_select$Material)
 
 #set lesser used categories to 'Other'
 site_select$Material[site_select$Material %in% var_change] = "Other" 
+
 ```
 
 # Site Attributes
@@ -129,6 +132,9 @@ site_attr <- site_attr %>%
   
 #join distance to mouth to main dataset
 site_select <- left_join(site_select, site_attr, by="Site") 
+
+site_select$Habitat[site_select$Habitat == "P"] <-"Pier"
+site_select$Habitat[site_select$Habitat == "SS"] <-"Sediment"
   
 ```
 
@@ -229,9 +235,17 @@ nd_hab$SE_upper <- pred_hab$fit + pred_hab$se.fit
 nd_hab$SE_lower <- pred_hab$fit - pred_hab$se.fit
 
 #plot the predicted means
-ggplot(nd_hab, aes(y=Total, x=DistKm)) + 
+p_hab <- ggplot(nd_hab, aes(y=Total, x=DistKm)) + 
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+  labs(title="Debris abundance predictions",
+       subtitle="By habitat and distance from harbour mouth",
+       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+  theme_minimal()
+
+p_hab
+
+ggsave(filename = "images/p_hab.pdf", plot = p_hab, device="pdf", height=7, width=12, units="in")
 
 ```
 
@@ -312,9 +326,17 @@ nd_fish$Total <- pred_fish$fit
 nd_fish$SE_upper <- pred_fish$fit + pred_fish$se.fit
 nd_fish$SE_lower <- pred_fish$fit - pred_fish$se.fit
 
-ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
+p_fish <- ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2)
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+    labs(title="Debris abundance predictions: Fishing related",
+       subtitle="By habitat and distance from harbour mouth",
+       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
+  theme_minimal()
+
+p_fish
+
+ggsave(filename = "images/p_fish.pdf", plot = p_fish, device="pdf", height=7, width=7, units="in")
 ```
 
 
@@ -330,17 +352,17 @@ mod_nonfish <- site_select %>%
          Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
-# m_nonfish1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat * DistKm + #predicted by Habitat 
+# m_nonfish  <- glmmTMB(Total ~ #Debris count
+#                  Habitat * DistKm + #predicted by Habitat
 #                  (1|Location) + (1|Date), #site random effect
 #                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
+#                data = mod_nonfish)
 
 m_nonfish  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat 
+                 Habitat + #predicted by Habitat
                  (1|Location) + (1|Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_nonfish) 
+               data = mod_nonfish)
 
 # m_nonfish3  <- glmmTMB(Total ~ #Debris count
 #                  DistKm + #predicted by Habitat 
@@ -374,6 +396,9 @@ testZeroInflation(simulationOutput_nonfish) #tests if there are more zeros than 
 # Predictors for non-fishing related debris are: Habitat
 
 nd_nonfish <- expand.grid(Habitat = unique(mod_nonfish$Habitat),
+                          # DistKm = seq(from = min(mod_nonfish$DistKm),
+                          #      to = max(mod_nonfish$DistKm),
+                          #      length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -389,9 +414,25 @@ nd_nonfish$SE_upper <- pred_nonfish$fit + pred_nonfish$se.fit
 nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
 
 
-ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
+p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
   geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
+   labs(title="Debris abundance predictions: Non-fishing related",
+       subtitle="By habitat",
+       x="Habitat", y="Total debris items", tag="") +
+  theme_minimal()
+
+p_nonfish
+
+ggsave(filename = "images/p_nonfish.pdf", plot = p_nonfish, device="pdf", height=7, width=7, units="in")
+
+# p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) +
+#   geom_line(aes(col=Habitat)) +
+#   geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+#     labs(title="Debris abundance predictions: Non-fishing related",
+#        subtitle="By habitat",
+#        x="Habitat", y="Total debris items", tag="") +
+#   theme_minimal()
 ```
 
 ## Testing fishing line debris type
@@ -469,9 +510,17 @@ nd_F2$SE_lower <- pred_F2$fit - pred_F2$se.fit
 
 #plot the predicted means
 
-ggplot(nd_F2, aes(y=Total, x=DistKm)) +
+p_F2 <- ggplot(nd_F2, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2)
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+    labs(title="Debris abundance predictions: Fishing line",
+       subtitle="By habitat and distance from harbour mouth",
+       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
+  theme_minimal()
+
+p_F2
+
+ggsave(filename = "images/p_F2.pdf", plot = p_F2, device="pdf", height=7, width=7, units="in")
 ```
 ## Testing hooks/sinkers debris type
 ```{r glm-hook, warning=FALSE, message=FALSE}
@@ -625,9 +674,17 @@ nd_btl$SE_lower <- pred_btl$fit - pred_btl$se.fit
 
 #plot the predicted means
 
-ggplot(nd_btl, aes(y=Total, x=Habitat)) +
+p_btl <- ggplot(nd_btl, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
+   labs(title="Debris abundance predictions: Glass bottle",
+       subtitle="By habitat",
+       x="Habitat", y="Total debris items", tag="") +
+  theme_minimal()
+
+p_btl
+
+ggsave(filename = "images/p_btl.pdf", plot = p_btl, device="pdf", height=7, width=7, units="in")
 ```
 
 # Regression coefficients
@@ -683,7 +740,7 @@ mod_hab$resid = resid(m_hab) #create a column for each survey event's residuals
   testTemporalAutocorrelation(m_watso$sum, 
                               time =  m_watso$Date) #test resid for temporal autocorrelation
 ```
-
+# glm plastic
 ```{r glm-plastic, warning=FALSE, message=FALSE}
 #create df of all plastic materials
 mod_plas <- site_select %>%
@@ -756,17 +813,28 @@ nd_plas$SE_lower <- pred_plas$fit - pred_plas$se.fit
 
 #plot the predicted means
 
-ggplot(nd_plas, aes(y=Total, x=DistKm)) +
+p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2)
-```
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+ labs(title="Debris abundance predictions: Plastic",
+       subtitle="By habitat and distance from harbour mouth",
+       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
+  theme_minimal()
 
+p_plas
+
+ggsave(filename = "images/p_plas.pdf", plot = p_plas, device="pdf", height=7, width=7, units="in")
+```
+# glm other material
 ```{r glm-othermat, warning=FALSE, message=FALSE}
 #create df of all misc materials
 mod_oth <- site_select %>%
   filter(Material=="Other") %>% #rubber, cloth, e-waste, ceramic, timber, bricks, etc
   group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) 
+  summarise(Total=sum(Total)) %>%
+    ungroup() %>%
+    mutate(Location = as.factor(Location),
+    Habitat = as.factor(Habitat))
 
 # #GLM negative binomial with two variables and zero inflation
 # m_oth1  <- glmmTMB(Total ~ #Debris count
@@ -778,8 +846,16 @@ mod_oth <- site_select %>%
 m_oth  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
                  (1|Location) + (1|Date), #site/date random effect
-               family=nbinom2(), #negative binomial to deal with count data and zeros
+               family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_oth)
+
+#GLM negative binomial with two variables and zero inflation
+# m_hook1  <- glmmTMB(Total ~ #Debris count
+#                  Habitat * DistKm +
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_hook) 
+
 
 # m_oth3  <- glmmTMB(Total ~ #Debris count
 #                  DistKm + #predicted by Habitat
@@ -829,11 +905,19 @@ nd_oth$SE_lower <- pred_oth$fit - pred_oth$se.fit
 
 #plot the predicted means
 
-ggplot(nd_oth, aes(y=Total, x=Habitat)) +
+p_oth <- ggplot(nd_oth, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower, width=0.2), position=position_dodge(width=0.90))
-```
+  geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower, width=0.2), position=position_dodge(width=0.90)) +
+ labs(title="Debris abundance predictions: Misc. material",
+       subtitle="By habitat",
+       x="Habitat", y="Total debris items", tag="") +
+  theme_minimal()
 
+p_oth
+
+ggsave(filename = "images/p_oth.pdf", plot = p_oth, device="pdf", height=7, width=7, units="in")
+```
+# glm glass
 ```{r glm-glsmat, warning=FALSE, message=FALSE}
 #create df of all misc materials
 mod_gls <- site_select %>%
@@ -903,10 +987,19 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 
 #plot the predicted means
 
-ggplot(nd_gls, aes(y=Total, x=Habitat)) +
+p_gls <- ggplot(nd_gls, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
+ labs(title="Debris abundance predictions: Glass",
+       subtitle="By habitat",
+       x="Habitat", y="Total debris items", tag="") +
+  theme_minimal()
+
+p_gls
+
+ggsave(filename = "images/p_gls.pdf", plot = p_gls, device="pdf", height=7, width=7, units="in")
 ```
+# glm metal
 ```{r glm-metmat, warning=FALSE, message=FALSE}
 #create df of all misc materials
 mod_met <- site_select %>%
@@ -975,9 +1068,17 @@ nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
 
 #plot the predicted means
 
-ggplot(nd_met, aes(y=Total, x=Habitat)) +
+p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
+ labs(title="Debris abundance predictions: Metal",
+       subtitle="By habitat",
+       x="Habitat", y="Total debris items", tag="") +
+  theme_minimal()
+
+p_met
+
+ggsave(filename = "images/p_met.pdf", plot = p_met, device="pdf", height=7, width=7, units="in")
 ```
 ```{r tidy-models}
 #Reference https://cran.r-project.org/web/packages/broom/vignettes/broom.html
@@ -1063,16 +1164,6 @@ tab_model(
 ```
 
 ```{r vegan}
-browseVignettes("vegan")
-
-data(dune)
-
-ord_vignette <- decorana(dune)
-plot(ord_vignette)
-
-ord_mds <- metaMDS(dune)
-
-plot(ord_mds)
 
 #Abundance data
   #Filter for top items
@@ -1098,12 +1189,23 @@ filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "
   length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
   abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
   
+  abund_community <- abund[4:21]
+  
   ord <- metaMDS(abund_community)
   plot(ord)
 
+#call pdf command to start the plot
+pdf(file = "images/MDS_veg.pdf",   # The directory you want to save the file in
+    width = 11, # The width of the plot in inches
+    height = 7) # The height of the plot in inches
+
+#create the plot
 plot(ord, type = "n")
 points(ord, display = "sites", cex = 0.8, pch=21, col="red", bg="yellow")
 text(ord, display = "spec", cex=0.7, col="blue")
+
+# Step 3: Run dev.off() to create the file!
+dev.off()
 
 ```
 ```{r MDS-tut}
@@ -1125,8 +1227,13 @@ MDS_xy <- data.frame(abund_community.mds$points)
 MDS_xy$Habitat <- abund$Habitat
 MDS_xy$Location <- abund$Location
 
+rename.values(MDS_xy$Habitat, c(P="Pier", SS="Sediment"))
 
-ggplot(MDS_xy, aes(MDS1, MDS2, color = Habitat)) + geom_point() + theme_bw()
+
+
+MDS_ec <- ggplot(MDS_xy, aes(MDS1, MDS2, color = Habitat)) + geom_point() + theme_bw()
+
+ggsave(filename = "images/MDS_ec.pdf", plot = MDS_ec, device="pdf", height=7, width=11, units="in")
 
 #not greater than 0.2
 abund_community.mds$stress
