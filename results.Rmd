@@ -311,7 +311,7 @@ p_top_lol <- top_lol %>%
 
 p_top_lol
 
-ggsave(filename = "images/p_toplol.pdf", plot = p_top_lol, device="pdf")
+ggsave(filename = "images/p_toplol.svg", plot = p_top_lol, device="svg")
 ```
 
 ## Mean of items by material type per site and habitat

@@ -245,7 +245,7 @@ p_hab <- ggplot(nd_hab, aes(y=Total, x=DistKm)) +
 
 p_hab
 
-ggsave(filename = "images/p_hab.pdf", plot = p_hab, device="pdf", height=7, width=12, units="in")
+ggsave(filename = "images/p_hab.svg", plot = p_hab, device="svg", height=7, width=12, units="in")
 
 ```
 
@@ -336,7 +336,7 @@ p_fish <- ggplot(nd_fish, aes(y=Total, x=DistKm)) +
 
 p_fish
 
-ggsave(filename = "images/p_fish.pdf", plot = p_fish, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_fish.svg", plot = p_fish, device="svg", height=7, width=7, units="in")
 ```
 
 
@@ -424,7 +424,7 @@ p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=Habitat)) +
 
 p_nonfish
 
-ggsave(filename = "images/p_nonfish.pdf", plot = p_nonfish, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_nonfish.svg", plot = p_nonfish, device="svg", height=7, width=7, units="in")
 
 # p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) +
 #   geom_line(aes(col=Habitat)) +
@@ -520,7 +520,7 @@ p_F2 <- ggplot(nd_F2, aes(y=Total, x=DistKm)) +
 
 p_F2
 
-ggsave(filename = "images/p_F2.pdf", plot = p_F2, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_F2.svg", plot = p_F2, device="svg", height=7, width=7, units="in")
 ```
 ## Testing hooks/sinkers debris type
 ```{r glm-hook, warning=FALSE, message=FALSE}
@@ -684,7 +684,7 @@ p_btl <- ggplot(nd_btl, aes(y=Total, x=Habitat)) +
 
 p_btl
 
-ggsave(filename = "images/p_btl.pdf", plot = p_btl, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_btl.svg", plot = p_btl, device="svg", height=7, width=7, units="in")
 ```
 
 # Regression coefficients
@@ -823,7 +823,7 @@ p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) +
 
 p_plas
 
-ggsave(filename = "images/p_plas.pdf", plot = p_plas, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_plas.svg", plot = p_plas, device="svg", height=7, width=7, units="in")
 ```
 # glm other material
 ```{r glm-othermat, warning=FALSE, message=FALSE}
@@ -915,7 +915,7 @@ p_oth <- ggplot(nd_oth, aes(y=Total, x=Habitat)) +
 
 p_oth
 
-ggsave(filename = "images/p_oth.pdf", plot = p_oth, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_oth.svg", plot = p_oth, device="svg", height=7, width=7, units="in")
 ```
 # glm glass
 ```{r glm-glsmat, warning=FALSE, message=FALSE}
@@ -997,7 +997,7 @@ p_gls <- ggplot(nd_gls, aes(y=Total, x=Habitat)) +
 
 p_gls
 
-ggsave(filename = "images/p_gls.pdf", plot = p_gls, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_gls.svg", plot = p_gls, device="svg", height=7, width=7, units="in")
 ```
 # glm metal
 ```{r glm-metmat, warning=FALSE, message=FALSE}
@@ -1078,7 +1078,7 @@ p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) +
 
 p_met
 
-ggsave(filename = "images/p_met.pdf", plot = p_met, device="pdf", height=7, width=7, units="in")
+ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
 ```
 ```{r tidy-models}
 #Reference https://cran.r-project.org/web/packages/broom/vignettes/broom.html
@@ -1194,8 +1194,8 @@ filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "
   ord <- metaMDS(abund_community)
   plot(ord)
 
-#call pdf command to start the plot
-pdf(file = "images/MDS_veg.pdf",   # The directory you want to save the file in
+#call svg command to start the plot
+svg(file = "images/MDS_veg.svg",   # The directory you want to save the file in
     width = 11, # The width of the plot in inches
     height = 7) # The height of the plot in inches
 
@@ -1211,8 +1211,8 @@ dev.off()
 ```{r MDS-tut}
 #reference http://environmentalcomputing.net/multidimensional-scaling/
 
-#df with only abundance
-abund_community <- abund[5:22]
+# #df with only abundance
+# abund_community <- abund[5:22]
 
 #create a dissimilarity matrix that measures similarity between every pair of samples
 abund_community.mds <- metaMDS(comm = abund_community, distance = "bray", trace = FALSE, autotransform = FALSE)
@@ -1227,13 +1227,13 @@ MDS_xy <- data.frame(abund_community.mds$points)
 MDS_xy$Habitat <- abund$Habitat
 MDS_xy$Location <- abund$Location
 
-rename.values(MDS_xy$Habitat, c(P="Pier", SS="Sediment"))
-
-
+# rename.values(MDS_xy$Habitat, c(P="Pier", SS="Sediment"))
 
 MDS_ec <- ggplot(MDS_xy, aes(MDS1, MDS2, color = Habitat)) + geom_point() + theme_bw()
 
-ggsave(filename = "images/MDS_ec.pdf", plot = MDS_ec, device="pdf", height=7, width=11, units="in")
+MDS_ec
+
+ggsave(filename = "images/MDS_ec.svg", plot = MDS_ec, device="svg", height=7, width=11, units="in")
 
 #not greater than 0.2
 abund_community.mds$stress

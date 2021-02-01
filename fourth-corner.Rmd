@@ -222,7 +222,16 @@ fit_allfixed <- gllvm(data=datalong,
                       formula = y ~ (Habitat + DistKm + Location) + 
                         (Habitat + DistKm + Location) * (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
+
+#call svg command to start the plot
+svg(file = "images/coefplot.svg",   # The directory you want to save the file in
+    width = 11, # The width of the plot in inches
+    height = 7) # The height of the plot in inches
+
 coefplot(fit_allfixed)
+
+# Step 3: Run dev.off() to create the file!
+dev.off()
 
 anova(fit_env, fit_allfixed)
 
@@ -295,4 +304,15 @@ plot.4th <- levelplot((as.matrix(fourth)),
 
 
 plot.4th
+
+#call svg command to start the plot
+svg(file = "images/plot4th.svg",   # The directory you want to save the file in
+    width = 11, # The width of the plot in inches
+    height = 7) # The height of the plot in inches
+
+#create the plot
+plot.4th
+
+# Step 3: Run dev.off() to create the file!
+dev.off()
 ```
