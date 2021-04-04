@@ -38,7 +38,6 @@ library(corrplot) #co-occurrence matrix
 library(gclus) #co-occurrence matrix
 library(broom.mixed) #regression tables
 library(vegan) #ordination
-
 library(sjPlot) #regression models as HTML table
 library(sjmisc) #regression models as HTML table
 library(sjlabelled) #regression models as HTML table
@@ -1052,7 +1051,7 @@ testZeroInflation(simulationOutput_met) #tests if there are more zeros than expe
 
 # Predictors for 'other' materials are: Habitat, Coast
 
-nd_met <- expand.grid(Habitat = unique(mod_oth$Habitat),
+nd_met <- expand.grid(Habitat = unique(mod_met$Habitat),
                   Location = NA,
                   Date = NA)
 
@@ -1162,16 +1161,28 @@ tab_model(
           string.ci = "Conf. Int (95%)"
 )
 ```
-
+## Ordination
 ```{r vegan}
 
 #Abundance data
   #Filter for top items
-site_select_top20 <- site_select %>%
-filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4"))
+top10 <- site_select %>%
+  group_by(Label) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(10, sum)
+
+#create vector from top 10 items
+top10 <- top10$Label
+top10 <- unlist(top10)
+site_select_top10 <- site_select %>%
+  filter(Label %in% top10)
+
+# site_select_top20 <- site_select %>%
+# filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4"))
 
   #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select_top20 %>%
+  abund_long <- site_select_top10 %>%
     mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
     group_by(survey_event, Location, Habitat, Date, Label) %>% 
     summarise(sum=sum(Total)) %>% #total of each item type per survey event
@@ -1189,10 +1200,35 @@ filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "
   length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
   abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
   
-  abund_community <- abund[4:21]
+  com <- abund[4:13]
   
-  ord <- metaMDS(abund_community)
-  plot(ord)
+  ord <- metaMDS(com)
+  
+  data.scores <- as.data.frame(scores(ord)) #create df of ord points
+  data.scores$Location <- abund$Location
+  data.scores$Habitat <- abund$Habitat
+  data.scores <- data.scores %>%
+    mutate(Habitat = as.factor(Habitat),
+           Location = as.factor(Location))
+  
+  species.scores <- as.data.frame(scores(ord, "species"))
+  species.scores$item <- rownames(species.scores) #create item id column
+  
+  Pier <- data.scores[data.scores$Habitat == "P", ][chull(data.scores[data.scores$Habitat ==
+    "P", c("NMDS1", "NMDS2")]), ]  # hull values for Pier
+Sediment <- data.scores[data.scores$Habitat == "SS", ][chull(data.scores[data.scores$Habitat ==
+    "SS", c("NMDS1", "NMDS2")]), ]  # hull values for Sediment
+#create polygons
+hull.data <- rbind(Pier, Sediment)  #combine groups
+hull.data
+
+  ggplot() +
+  geom_polygon(data=hull.data,aes(x=NMDS1,y=NMDS2,fill=Habitat),alpha=0.1) +
+  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
+  geom_point(data=data.scores, 
+             aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
+  coord_equal() +
+  theme_bw()
 
 #call svg command to start the plot
 svg(file = "images/MDS_veg.svg",   # The directory you want to save the file in
@@ -1204,7 +1240,7 @@ plot(ord, type = "n")
 points(ord, display = "sites", cex = 0.8, pch=21, col="red", bg="yellow")
 text(ord, display = "spec", cex=0.7, col="blue")
 
-# Step 3: Run dev.off() to create the file!
+# Step 3: Run dev.off() to create the file
 dev.off()
 
 ```
