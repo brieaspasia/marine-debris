@@ -681,6 +681,8 @@ hull.data
   coord_equal() +
    theme(legend.position = "none",
         panel.background = element_blank())
+  
+  p_ord
 
 svg("images/p_ord.svg", height=7, width=11)
 plot(p_ord, height=7, width=11, units="in")
@@ -801,6 +803,12 @@ svg(file = "images/coefplot.svg",   # The directory you want to save the file in
     width = 11, # The width of the plot in inches
     height = 7) # The height of the plot in inches
 coefplot(fit_allfixed)
+dev.off()
+
+t <- fit_allfixed$data
+
+png(file = "images/coefplot.png")  # The directory you want to save the file in
+coefplot(fit_allfixed, cex.ylab = .8)
 dev.off()
 
 fourth <- fit_allfixed$fourth.corner
