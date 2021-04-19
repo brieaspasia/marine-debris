@@ -208,15 +208,15 @@ nd_hab$SE_lower <- pred_hab$fit - pred_hab$se.fit
 #plot the predicted means
 p_hab <- ggplot(nd_hab, aes(y=Total, x=DistKm)) + 
   geom_line(aes(col=Habitat)) +
-  # labs(title="Debris abundance predictions",
-  #      subtitle="By habitat and distance from harbour mouth",
-  #      x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-    theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
+  labs(title="Debris abundance predictions",
+       subtitle="By habitat and distance from harbour mouth",
+       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+    # theme(legend.position = "none",
+    #     panel.grid = element_blank(),
+    #     axis.title = element_blank(),
+    #     axis.text = element_blank(),
+    #     panel.background = element_blank()) 
 
 p_hab
 
