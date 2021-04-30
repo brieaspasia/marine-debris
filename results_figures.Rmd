@@ -382,20 +382,20 @@ nd_F2$SE_lower <- pred_F2$fit - pred_F2$se.fit
 
 p_F2 <- ggplot(nd_F2, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-   theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
 
 p_F2
 
 # ggsave(filename = "images/p_F2.svg", plot = p_F2, device="svg", height=7, width=7, units="in")
 
-svg("images/p_F2.svg")
-plot(p_F2, height=7, width=7, units="in")
-dev.off()
+# svg("images/p_F2.svg")
+# plot(p_F2, height=7, width=7, units="in")
+# dev.off()
 
 ```
 ## Testing glass bottles debris type
@@ -442,20 +442,20 @@ nd_btl$SE_lower <- pred_btl$fit - pred_btl$se.fit
 
 p_btl <- ggplot(nd_btl, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-   theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
 
 p_btl
 
 # ggsave(filename = "images/p_btl.svg", plot = p_btl, device="svg", height=7, width=7, units="in")
 
-svg("images/p_btl.svg")
-plot(p_btl, height=7, width=7, units="in")
-dev.off()
+# svg("images/p_btl.svg")
+# plot(p_btl, height=7, width=7, units="in")
+# dev.off()
 
 ```
 
@@ -497,20 +497,20 @@ nd_plas$SE_lower <- pred_plas$fit - pred_plas$se.fit
 
 p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-   theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
 
 p_plas
 
 # ggsave(filename = "images/p_plas.svg", plot = p_plas, device="svg", height=7, width=7, units="in")
 
-svg("images/p_plas.svg")
-plot(p_plas, height=7, width=7, units="in")
-dev.off()
+# svg("images/p_plas.svg")
+# plot(p_plas, height=7, width=7, units="in")
+# dev.off()
 
 ```
 # glm glass
@@ -549,11 +549,12 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 p_gls <- ggplot(nd_gls, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
+  ylim(0, 30) +
    theme(legend.position = "none",
         panel.grid = element_blank(),
         axis.title = element_blank(),
         axis.text = element_blank(),
-        panel.background = element_blank()) 
+        panel.background = element_blank())
 
 p_gls
 
@@ -600,17 +601,18 @@ nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
 p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-   theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
+  ylim(0, 30) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank())
 
 p_met
 
-svg("images/p_met.svg")
-plot(p_met, height=7, width=7, units="in")
-dev.off()
+# svg("images/p_met.svg")
+# plot(p_met, height=7, width=7, units="in")
+# dev.off()
 
 # ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
 ```
