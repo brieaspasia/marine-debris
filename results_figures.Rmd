@@ -667,17 +667,26 @@ site_select_top10 <- site_select %>%
   species.scores <- as.data.frame(scores(ord, "species"))
   species.scores$item <- rownames(species.scores) #create item id column
   
-  Pier <- data.scores[data.scores$Habitat == "P", ][chull(data.scores[data.scores$Habitat ==
-    "P", c("NMDS1", "NMDS2")]), ]  # hull values for Pier
-Sediment <- data.scores[data.scores$Habitat == "SS", ][chull(data.scores[data.scores$Habitat ==
-    "SS", c("NMDS1", "NMDS2")]), ]  # hull values for Sediment
-#create polygons
-hull.data <- rbind(Pier, Sediment)  #combine groups
-hull.data
+#create ellipsis
+#add group column to data.scores
+NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.scores$Habitat)
+ veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+  {
+    theta <- (0:npoints) * 2 * pi/npoints
+    Circle <- cbind(cos(theta), sin(theta))
+    t(center + scale * t(Circle %*% chol(cov)))
+  }
+  df_ell <- data.frame()
+  for(g in levels(NMDS$group)){
+    df_ell <- rbind(df_ell, cbind(as.data.frame(with(NMDS[NMDS$group==g,],
+                    veganCovEllipse(cov.wt(cbind(NMDS1,NMDS2),wt=rep(1/length(NMDS1),length(NMDS1)))$cov,center=c(mean(NMDS1),mean(NMDS2)))))
+                    ,group=g))
+  }
 
   p_ord <- ggplot() +
-  geom_polygon(data=hull.data,aes(x=NMDS1,y=NMDS2,fill=Habitat),alpha=0.1) +
   # geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
+  geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
+            size=1, linetype=2) +
   geom_point(data=data.scores, 
              aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
   coord_equal() +
@@ -686,22 +695,133 @@ hull.data
   
   p_ord
 
-svg("images/p_ord.svg", height=7, width=11)
-plot(p_ord, height=7, width=11, units="in")
-dev.off()
+# svg("images/p_ord.svg", height=7, width=11)
+# plot(p_ord, height=7, width=11, units="in")
+# dev.off()
 
   p_ord_txt <- ggplot() +
-  geom_polygon(data=hull.data,aes(x=NMDS1,y=NMDS2,fill=Habitat),alpha=0.1) +
+  geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
+            size=1, linetype=2) +
   geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
   geom_point(data=data.scores, 
              aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
   coord_equal() +
    theme(legend.position = "none",
         panel.background = element_blank())
+  
+p_ord_txt
 
-svg("images/p_ord_txt.svg", height=7, width=11)
-plot(p_ord_txt, height=7, width=11, units="in")
-dev.off()
+# svg("images/p_ord_txt.svg", height=7, width=11)
+# plot(p_ord_txt, height=7, width=11, units="in")
+# dev.off()
+
+```
+
+```{r vegan-20}
+
+#Abundance data
+#   #Filter for top items
+# top20 <- site_select %>%
+#   group_by(Label) %>%
+#   summarise(sum=sum(Total)) %>%
+#   arrange(desc(sum)) %>%
+#   top_n(20, sum)
+# 
+# #create vector from top 20 items
+# top20 <- top20$Label
+# top20 <- unlist(top20)
+site_select_top20 <- site_select %>%
+  filter(ID %in% top20)
+
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select_top20 %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, Location, Habitat, Date, Label) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+  group_by(Label) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, Label, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+  
+  com <- abund[4:23]
+  
+  ord <- metaMDS(com)
+  
+  data.scores <- as.data.frame(scores(ord)) #create df of ord points
+  data.scores$Location <- abund$Location
+  data.scores$Habitat <- abund$Habitat
+  data.scores <- data.scores %>%
+    mutate(Habitat = as.factor(Habitat),
+           Location = as.factor(Location))
+  
+  species.scores <- as.data.frame(scores(ord, "species"))
+  species.scores$item <- rownames(species.scores) #create item id column
+ 
+#create hull data 
+  Pier <- data.scores[data.scores$Habitat == "P", ][chull(data.scores[data.scores$Habitat ==
+    "P", c("NMDS1", "NMDS2")]), ]  # hull values for Pier
+Sediment <- data.scores[data.scores$Habitat == "SS", ][chull(data.scores[data.scores$Habitat ==
+    "SS", c("NMDS1", "NMDS2")]), ]  # hull values for Sediment
+#create polygons
+hull.data <- rbind(Pier, Sediment)  #combine groups
+hull.data
+
+#create ellipsis
+#add group column to data.scores
+NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.scores$Habitat)
+ veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+  {
+    theta <- (0:npoints) * 2 * pi/npoints
+    Circle <- cbind(cos(theta), sin(theta))
+    t(center + scale * t(Circle %*% chol(cov)))
+  }
+  df_ell <- data.frame()
+  for(g in levels(NMDS$group)){
+    df_ell <- rbind(df_ell, cbind(as.data.frame(with(NMDS[NMDS$group==g,],
+                    veganCovEllipse(cov.wt(cbind(NMDS1,NMDS2),wt=rep(1/length(NMDS1),length(NMDS1)))$cov,center=c(mean(NMDS1),mean(NMDS2)))))
+                    ,group=g))
+  }
+
+  p_ord <- ggplot() +
+  # geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
+  geom_point(data=data.scores, 
+             aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
+  geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
+            size=1, linetype=2) +
+  coord_equal() +
+   theme(legend.position = "none",
+        panel.background = element_blank())
+  
+  p_ord
+
+# svg("images/p_ord.svg", height=7, width=11)
+# plot(p_ord, height=7, width=11, units="in")
+# dev.off()
+
+  p_ord_txt <- ggplot() +
+  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
+  geom_point(data=data.scores, 
+             aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
+  geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
+            size=1, linetype=2) +
+  coord_equal() +
+   theme(legend.position = "none",
+        panel.background = element_blank())
+  
+  p_ord_txt
+
+# svg("images/p_ord_txt.svg", height=7, width=11)
+# plot(p_ord_txt, height=7, width=11, units="in")
+# dev.off()
 
 ```
 ## Fourth corner analysis
