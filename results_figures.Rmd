@@ -105,6 +105,13 @@ site_attr <- site_attr %>%
 site_select <- left_join(site_select, site_attr, by="Site") 
 ```
 
+```{r high-level}
+t <- site_select %>%
+  group_by(Habitat) %>%
+  summarise(sum=sum(Total))
+```
+
+
 ```{r results-map, fig.cap="Fig 1: Mean debris count and proportion per habitat", out.width = '100%'}
 knitr::include_graphics("images/Sites.svg")
 ```
@@ -657,6 +664,9 @@ site_select_top10 <- site_select %>%
   
   ord <- metaMDS(com)
   
+  ord$stress
+  # 0.1419583
+  
   data.scores <- as.data.frame(scores(ord)) #create df of ord points
   data.scores$Location <- abund$Location
   data.scores$Habitat <- abund$Habitat
@@ -765,15 +775,6 @@ site_select_top20 <- site_select %>%
   
   species.scores <- as.data.frame(scores(ord, "species"))
   species.scores$item <- rownames(species.scores) #create item id column
- 
-#create hull data 
-  Pier <- data.scores[data.scores$Habitat == "P", ][chull(data.scores[data.scores$Habitat ==
-    "P", c("NMDS1", "NMDS2")]), ]  # hull values for Pier
-Sediment <- data.scores[data.scores$Habitat == "SS", ][chull(data.scores[data.scores$Habitat ==
-    "SS", c("NMDS1", "NMDS2")]), ]  # hull values for Sediment
-#create polygons
-hull.data <- rbind(Pier, Sediment)  #combine groups
-hull.data
 
 #create ellipsis
 #add group column to data.scores
@@ -803,9 +804,9 @@ NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.sco
   
   p_ord
 
-# svg("images/p_ord.svg", height=7, width=11)
-# plot(p_ord, height=7, width=11, units="in")
-# dev.off()
+svg("images/p_ord.svg", height=7, width=11)
+plot(p_ord, height=7, width=11, units="in")
+dev.off()
 
   p_ord_txt <- ggplot() +
   geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
@@ -916,7 +917,7 @@ Coefficient plot shows estimated coefficients (ticks) and their 95% confidence i
 ```{r 4th-corner-heatmap, fig.cap="Figure 5: Fourth corner heatmap"}
 # Model with environmental and trait variables as predictors
 fit_allfixed <- gllvm(data=datalong, 
-                      formula = y ~ (Habitat + DistKm) + 
+                      formula = y ~ (0 + Habitat + DistKm) + 
                         (Habitat + DistKm) * (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
 
