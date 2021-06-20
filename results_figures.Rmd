@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+sessionInfo()
 ```
 
 ```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
@@ -921,6 +923,8 @@ fit_allfixed <- gllvm(data=datalong,
                         (Habitat + DistKm) * (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
 
+coefplot(fit_allfixed)
+
 #call svg command to start the plot
 svg(file = "images/coefplot.svg",   # The directory you want to save the file in
     width = 11, # The width of the plot in inches
@@ -940,6 +944,8 @@ colort <- colorRampPalette(c("blue", "white", "red"))
 plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables", 
                       ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
                       at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
+
+plot.4th
 
 #call svg command to start the plot
 svg(file = "images/plot4th.svg",   # The directory you want to save the file in
