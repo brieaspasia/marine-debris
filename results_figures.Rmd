@@ -218,7 +218,8 @@ nd_hab$SE_lower <- pred_hab$fit - pred_hab$se.fit
 p_hab <- ggplot(nd_hab, aes(y=Total, x=DistKm)) + 
   geom_line(aes(col=Habitat)) +
   labs(title="Debris abundance predictions",
-       subtitle="By habitat and distance from harbour mouth",
+
+              subtitle="By habitat and distance from harbour mouth",
        x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
   geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
     # theme(legend.position = "none",
@@ -235,6 +236,7 @@ svg("images/p_hab.svg")
 plot(p_hab, height=7, width=12, units="in")
 dev.off()
 
+citation("stats")
 ```
 
 ```{r glm-fish, warning=FALSE, message=FALSE}
@@ -308,7 +310,7 @@ mod_nonfish <- site_select %>%
          Habitat = as.factor(Habitat))
 
 m_nonfish  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
+                 Habitat * DistKm + #predicted by Habitat
                  (1|Location) + (1|Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_nonfish)
@@ -316,9 +318,9 @@ m_nonfish  <- glmmTMB(Total ~ #Debris count
 # Predictors for non-fishing related debris are: Habitat
 
 nd_nonfish <- expand.grid(Habitat = unique(mod_nonfish$Habitat),
-                          # DistKm = seq(from = min(mod_nonfish$DistKm),
-                          #      to = max(mod_nonfish$DistKm),
-                          #      length=1000),
+                          DistKm = seq(from = min(mod_nonfish$DistKm),
+                               to = max(mod_nonfish$DistKm),
+                               length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -334,21 +336,79 @@ nd_nonfish$SE_upper <- pred_nonfish$fit + pred_nonfish$se.fit
 nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
 
 
-p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-   theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
+p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) + 
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
 
 p_nonfish
+
+
 
 # ggsave(filename = "images/p_nonfish.svg", plot = p_nonfish, device="svg", height=7, width=7, units="in")
 
 svg("images/p_nonfish.svg")
 plot(p_nonfish, height=7, width=7, units="in")
+dev.off()
+
+```
+
+```{r glm-nonfish-drop, warning=FALSE, message=FALSE}
+#create df to use for models
+mod_nonfish_drop <- site_select %>%
+  filter(Fishing=="Non-Fishing") %>% #nonfishing debris
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+m_nonfish_drop  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_nonfish_drop)
+
+# Predictors for non-fishing related debris are: Habitat
+
+nd_nonfish_drop <- expand.grid(Habitat = unique(mod_nonfish_drop$Habitat),
+                          # DistKm = seq(from = min(mod_nonfish$DistKm),
+                          #      to = max(mod_nonfish$DistKm),
+                          #      length=1000),
+                  Location = NA,
+                  Date = NA)
+
+
+pred_nonfish_drop <- predict(object = m_nonfish_drop,
+                         newdata = nd_nonfish_drop,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_nonfish_drop$Total <- pred_nonfish_drop$fit
+nd_nonfish_drop$SE_upper <- pred_nonfish_drop$fit + pred_nonfish_drop$se.fit
+nd_nonfish_drop$SE_lower <- pred_nonfish_drop$fit - pred_nonfish_drop$se.fit
+
+
+p_nonfish_drop <- ggplot(nd_nonfish_drop, aes(y=Total, x=Habitat)) + 
+  geom_col(aes(fill=Habitat)) +
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
+
+p_nonfish_drop
+
+# ggsave(filename = "images/p_nonfish.svg", plot = p_nonfish, device="svg", height=7, width=7, units="in")
+
+svg("images/p_nonfish_drop.svg")
+plot(p_nonfish_drop, height=7, width=7, units="in")
 dev.off()
 
 ```
@@ -408,6 +468,61 @@ p_F2
 
 ```
 ## Testing glass bottles debris type
+```{r glm-btl_drop, warning=FALSE, message=FALSE}
+#create df of glass bottles to use for models
+mod_btl <- site_select %>%
+  filter(ID=="G1") %>% #glass bottles
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#GLM negative binomial with two variables and zero inflation
+m_btl_drop  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat and distance
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_btl)
+
+
+# Predictors for glass bottles are: Habitat, Coast
+
+nd_btl_drop <- expand.grid(Habitat = unique(mod_btl$Habitat),
+                  Location = NA,
+                  Date = NA)
+
+pred_btl_drop <- predict(object = m_btl_drop,
+                         newdata = nd_btl_drop,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_btl_drop$Total <- pred_btl_drop$fit
+nd_btl_drop$SE_upper <- pred_btl_drop$fit + pred_btl_drop$se.fit
+nd_btl_drop$SE_lower <- pred_btl_drop$fit - pred_btl_drop$se.fit
+
+#plot the predicted means
+
+p_btl_drop <- ggplot(nd_btl_drop, aes(y=Total, x=Habitat)) +
+  geom_col(aes(fill=Habitat)) +
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
+
+p_btl_drop
+
+# ggsave(filename = "images/p_btl_drop.svg", plot = p_btl_drop, device="svg", height=7, width=7, units="in")
+
+# svg("images/p_btl_drop.svg")
+# plot(p_btl_drop, height=7, width=7, units="in")
+# dev.off()
+
+```
+
 ```{r glm-btl, warning=FALSE, message=FALSE}
 #create df of glass bottles to use for models
 mod_btl <- site_select %>%
@@ -419,14 +534,8 @@ mod_btl <- site_select %>%
          Habitat = as.factor(Habitat))
 
 #GLM negative binomial with two variables and zero inflation
-# m_btl1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat*DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-
 m_btl  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
+                 Habitat*DistKm + #predicted by Habitat
                  (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_btl)
@@ -434,6 +543,9 @@ m_btl  <- glmmTMB(Total ~ #Debris count
 # Predictors for glass bottles are: Habitat, Coast
 
 nd_btl <- expand.grid(Habitat = unique(mod_btl$Habitat),
+                              DistKm = seq(from = min(mod_F2$DistKm),
+                               to = max(mod_F2$DistKm),
+                               length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -449,9 +561,9 @@ nd_btl$SE_lower <- pred_btl$fit - pred_btl$se.fit
 
 #plot the predicted means
 
-p_btl <- ggplot(nd_btl, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) 
+p_btl <- ggplot(nd_btl, aes(y=Total, x=DistKm)) +
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -462,9 +574,9 @@ p_btl
 
 # ggsave(filename = "images/p_btl.svg", plot = p_btl, device="svg", height=7, width=7, units="in")
 
-# svg("images/p_btl.svg")
-# plot(p_btl, height=7, width=7, units="in")
-# dev.off()
+svg("images/p_btl.svg")
+plot(p_btl, height=7, width=7, units="in")
+dev.off()
 
 ```
 
@@ -532,7 +644,7 @@ mod_gls <- site_select %>%
 
 
 m_gls  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
+                 Habitat*DistKm + #predicted by Habitat
                  (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_gls)
@@ -540,6 +652,9 @@ m_gls  <- glmmTMB(Total ~ #Debris count
 # Predictors for 'other' materials are: Habitat, Coast
 
 nd_gls <- expand.grid(Habitat = unique(mod_gls$Habitat),
+                      DistKm = seq(from = min(mod_plas$DistKm),
+                               to = max(mod_plas$DistKm),
+                               length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -555,7 +670,58 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 
 #plot the predicted means
 
-p_gls <- ggplot(nd_gls, aes(y=Total, x=Habitat)) +
+p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) +
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank())
+
+p_gls
+
+# ggsave(filename = "images/p_gls.svg", plot = p_gls, device="svg", height=7, width=7, units="in")
+
+svg("images/p_gls.svg")
+plot(p_gls, height=7, width=7, units="in")
+dev.off()
+
+```
+
+```{r glm-glsmat_drop, warning=FALSE, message=FALSE}
+#create df of all misc materials
+mod_gls <- site_select %>%
+  filter(Material=="Glass") %>% #glass
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+
+m_gls_drop  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_gls)
+
+# Predictors for 'other' materials are: Habitat, Coast
+
+nd_gls_drop <- expand.grid(Habitat = unique(mod_gls$Habitat),
+                  Location = NA,
+                  Date = NA)
+
+pred_gls_drop <- predict(object = m_gls_drop,
+                         newdata = nd_gls_drop,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_gls_drop$Total <- pred_gls_drop$fit
+nd_gls_drop$SE_upper <- pred_gls_drop$fit + pred_gls_drop$se.fit
+nd_gls_drop$SE_lower <- pred_gls_drop$fit - pred_gls_drop$se.fit
+
+#plot the predicted means
+
+p_gls_drop <- ggplot(nd_gls_drop, aes(y=Total, x=Habitat)) +
   geom_col(aes(fill=Habitat)) +
   geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
   ylim(0, 30) +
@@ -565,12 +731,12 @@ p_gls <- ggplot(nd_gls, aes(y=Total, x=Habitat)) +
         axis.text = element_blank(),
         panel.background = element_blank())
 
-p_gls
+p_gls_drop
 
-# ggsave(filename = "images/p_gls.svg", plot = p_gls, device="svg", height=7, width=7, units="in")
+# ggsave(filename = "images/p_gls_drop.svg", plot = p_gls_drop, device="svg", height=7, width=7, units="in")
 
-svg("images/p_gls.svg")
-plot(p_gls, height=7, width=7, units="in")
+svg("images/p_gls_drop.svg")
+plot(p_gls_drop, height=7, width=7, units="in")
 dev.off()
 
 ```
@@ -584,7 +750,7 @@ mod_met <- site_select %>%
 
 # #GLM negative binomial with two variables and zero inflation
 m_met  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
+                 Habitat*DistKm + #predicted by Habitat
                  (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_met)
@@ -592,6 +758,9 @@ m_met  <- glmmTMB(Total ~ #Debris count
 # Predictors for 'other' materials are: Habitat, Coast
 
 nd_met <- expand.grid(Habitat = unique(mod_met$Habitat),
+                      DistKm = seq(from = min(mod_plas$DistKm),
+                               to = max(mod_plas$DistKm),
+                               length=1000),
                   Location = NA,
                   Date = NA)
 
@@ -607,10 +776,9 @@ nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
 
 #plot the predicted means
 
-p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-  ylim(0, 30) 
+p_met <- ggplot(nd_met, aes(y=Total, x=DistKm)) +
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -624,6 +792,57 @@ p_met
 # dev.off()
 
 # ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
+```
+
+```{r glm-metmat, warning=FALSE, message=FALSE}
+#create df of all misc materials
+mod_met <- site_select %>%
+  filter(Material=="Metal") %>% #glass
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+# #GLM negative binomial with two variables and zero inflation
+m_met_drop  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_met)
+
+# Predictors for 'other' materials are: Habitat, Coast
+
+nd_met_drop <- expand.grid(Habitat = unique(mod_met$Habitat),
+                  Location = NA,
+                  Date = NA)
+
+pred_met_drop <- predict(object = m_met_drop,
+                         newdata = nd_met_drop,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_met_drop$Total <- pred_met_drop$fit
+nd_met_drop$SE_upper <- pred_met_drop$fit + pred_met_drop$se.fit
+nd_met_drop$SE_lower <- pred_met_drop$fit - pred_met_drop$se.fit
+
+#plot the predicted means
+
+p_met_drop <- ggplot(nd_met_drop, aes(y=Total, x=Habitat)) +
+  geom_col(aes(fill=Habitat)) +
+  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
+  ylim(0, 30) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank())
+
+p_met_drop
+
+# svg("images/p_met_drop.svg")
+# plot(p_met_drop, height=7, width=7, units="in")
+# dev.off()
+
+# ggsave(filename = "images/p_met_drop.svg", plot = p_met_drop, device="svg", height=7, width=7, units="in")
 ```
 
 ## Ordination
@@ -768,6 +987,9 @@ site_select_top20 <- site_select %>%
   
   ord <- metaMDS(com)
   
+  ord$stress 
+  #0.167787
+  
   data.scores <- as.data.frame(scores(ord)) #create df of ord points
   data.scores$Location <- abund$Location
   data.scores$Habitat <- abund$Habitat
@@ -909,8 +1131,10 @@ yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
                 colnames(y), v.names = "y", timevar = "sp")
 #id is the site (1:20), sp is the debris ID, y is the count
 TR2 <- data.frame(sp = 1:62, TR)
+
 datalong <- merge(yX, TR2, by = "sp")
 ```
+
 
 Here we see that nothing is interacting significantly with distance to harbour mouth, however both fishing and encumbered drift are interacting with habitat significantly.
 
@@ -922,6 +1146,8 @@ fit_allfixed <- gllvm(data=datalong,
                       formula = y ~ (0 + Habitat + DistKm) + 
                         (Habitat + DistKm) * (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
+
+summary(fit_allfixed)
 
 coefplot(fit_allfixed)
 
@@ -954,6 +1180,7 @@ svg(file = "images/plot4th.svg",   # The directory you want to save the file in
 plot(plot.4th)
 dev.off()
 ```
+
 
 
 
