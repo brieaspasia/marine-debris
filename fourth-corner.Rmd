@@ -70,26 +70,17 @@ CSIRO debris classification system was modified to assign a material type and wh
 #load item names
 item_code <- read.csv(file="data/CSIRO-code.csv", 
                       header=T, sep=",",
-                      fileEncoding="UTF-8-BOM") #removes special characters) 
+                       fileEncoding="UTF-8-BOM") #removes special characters
 
-# #filter out material as some item types may have more than one material type 
-# #(ex. fishing items, furniture)
-# item_code <- item_code %>%
-#   dplyr::select(ID, item_name, Fishing, Dispersiveness) 
+#filter out material as some item types may have more than one material type 
+#(ex. fishing items, furniture)
+item_code <- item_code %>%
+  dplyr::select(ID, item_name, Material, Dispersiveness, Fishing, Label) 
 
-site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code")) 
+site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
 
-#state variables to rename (strict)
-var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "")
-
-# #state variables to rename (loose)
-# var_change <- c("Ceramic", "Undetermined", "Paper", "Construction", "Organic", "Unknown", "Foam", "") 
-
-#change Material to character
-site_select$Material <- as.character(site_select$Material) 
-
-#set lesser used categories to 'Other'
-site_select$Material[site_select$Material %in% var_change] = "Other" 
+site_select <- site_select %>%
+  mutate(item = paste(Material, item_name, sep=": "))
 ```
 
 # Site Attributes
@@ -100,12 +91,11 @@ site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEn
 
 #add distance to harbour mouth to site_select data
 site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis) %>% #select only distance to harbour mouth for join
+  dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
   mutate(DistKm = CostDis/100) #distance to harbour mouth
   
 #join distance to mouth to main dataset
 site_select <- left_join(site_select, site_attr, by="Site") 
-  
 ```
 # Fourth corner model set-up
 Creating dataframes for abundance of debris types, environmental variables, and traits of each debris type.
@@ -141,13 +131,23 @@ Creating dataframes for abundance of debris types, environmental variables, and 
       dplyr::select(survey_event, Habitat, DistKm, Location) %>%
       distinct()
     
+  # #create column for each habitat
+  # env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
+  # env$P <- ifelse(is.na(env$P), 0, 1)
+  # env$SS <- ifelse(is.na(env$SS), 0, 2)
+  # env$P <- as.numeric(env$P) #convert factor to numeric
+  # env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
+  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
+    
   #convert survey event to rowname
   length(unique(env$survey_event)) == nrow(env) #checking for duplicates
   env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  
   #convert Habitat to numeric
   env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
   env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
-  # #convert Location to numeric
+  #convert Location to numeric
   env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
   env$Location <- as.numeric(env$Location) #convert factor to numeric
 
@@ -167,17 +167,14 @@ Creating dataframes for abundance of debris types, environmental variables, and 
     inner_join(IDs, by="ID") %>% #remove items with 0 count
     column_to_rownames(var="ID") #create rownames from ID
   
-  #state variables to rename (strict)
-  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "")
-  
-#   #state variables to rename (loose)
-# var_change <- c("Ceramic", "Undetermined", "Paper", "Construction", "Organic", "Unknown", "Foam", "Rubber", "Timber", "E-waste", "") 
+  #state variables to rename
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
   
   #change Material to character
   TR$Material <- as.character(TR$Material) 
   
   #set lesser used categories to 'Other'
-  TR$Material[TR$Material %in% var_change] = "Other"
+  TR$Material[TR$Material %in% var_change] = "Other" 
 
   TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
   TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
@@ -186,6 +183,407 @@ Creating dataframes for abundance of debris types, environmental variables, and 
 y <- as.matrix(abund)
 X <- scale(as.matrix(env))
 TR <- TR
+
+fit <- gllvm(y, X, TR, family="negative.binomial",
+                formula= y~(Habitat + DistKm) +
+                  (Habitat + DistKm) : (Dispersiveness + Fishing + Material))
+
+coefplot(fit)
+
+
+fourth <- fit$fourth.corner
+a <- max( abs(fourth))
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), 
+                      xlab = "Environmental Variables", 
+                      ylab = "Debris traits",
+                      col.regions = colort(100), #use defined colour palette
+                      cex.lab = 1.3, #specify size of the label text
+                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
+                      scales = list(x = list(rot = 45))) #rotate text for clarity
+
+
+plot.4th
+```
+
+```{r gllvm-set-up-only-pier, warning=FALSE, message=FALSE, results="hide"}
+#Abundance
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+  filter(Habitat=="P") %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+
+#Environment
+  #create survey event and filter zero sum surveys, 
+    env <- site_select %>%
+    filter(Habitat=="P") %>%
+    mutate(survey_event=paste0(Date, Site)) %>%
+      group_by(survey_event) %>%
+      mutate(sum=sum(Total)) %>%
+      filter(sum>0) %>%
+      dplyr::select(survey_event, DistKm, Location) %>%
+      distinct()
+    
+  # #create column for each habitat
+  # env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
+  # env$P <- ifelse(is.na(env$P), 0, 1)
+  # env$SS <- ifelse(is.na(env$SS), 0, 2)
+  # env$P <- as.numeric(env$P) #convert factor to numeric
+  # env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
+  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
+    
+  #convert survey event to rowname
+  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
+  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  
+  # #convert Habitat to numeric
+  # env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
+  # env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
+  #convert Location to numeric
+  env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
+  env$Location <- as.numeric(env$Location) #convert factor to numeric
+
+#Traits
+  
+  #create column of usable IDs to join
+  IDs <- abund %>%
+    gather(ID, sum) %>%
+    dplyr::select(ID) %>%
+    unique()
+  #create trait df with ID type as row and columns are fishing and dispersiveness
+  TR <- site_select %>%
+    filter(Habitat=="P") %>%
+    group_by(ID) %>%
+    summarise(sum=sum(Total)) %>%
+    left_join(item_code, by="ID") %>%
+    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>% #remove items with 0 count
+    column_to_rownames(var="ID") #create rownames from ID
+  
+  #state variables to rename
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+  
+  #change Material to character
+  TR$Material <- as.character(TR$Material) 
+  
+  #set lesser used categories to 'Other'
+  TR$Material[TR$Material %in% var_change] = "Other" 
+
+  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
+  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
+  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
+
+y <- as.matrix(abund)
+X <- scale(as.matrix(env))
+TR <- TR
+
+# #Data long
+# yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
+#                 colnames(y), v.names = "y", timevar = "sp")
+# #id is the site (1:20), sp is the debris ID, y is the count
+# TR2 <- data.frame(sp = 1:62, TR)
+# 
+# datalong <- merge(yX, TR2, by = "sp")
+
+fit4th <- gllvm(y, X, TR, family="negative.binomial",
+                formula= y~(DistKm) +
+                  (DistKm) : (Dispersiveness + Fishing + Material))
+
+
+# fit4th2 <- gllvm(y, X, TR, family="negative.binomial",
+#                 formula= y~(Habitat + DistKm))
+
+# anova(fit4th, fit4th2)
+#p-value of 0.0197716 suggests that the model with traits is more appropriate. #Is this right? Reference below
+#https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13303
+#I reckon this is right because the QQplot without traits deviates from the line more
+
+fourth <- fit4th$fourth.corner
+a <- max( abs(fourth))
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), 
+                      xlab = "Environmental Variables", 
+                      ylab = "Debris traits",
+                      col.regions = colort(100), #use defined colour palette
+                      cex.lab = 1.3, #specify size of the label text
+                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
+                      scales = list(x = list(rot = 45))) #rotate text for clarity
+
+
+plot.4th
+
+summary(fourth)
+
+```
+
+```{r gllvm-set-up-only-ss, warning=FALSE, message=FALSE, results="hide"}
+#Abundance
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+  filter(Habitat=="SS") %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+
+#Environment
+  #create survey event and filter zero sum surveys, 
+    env <- site_select %>%
+    filter(Habitat=="SS") %>%
+    mutate(survey_event=paste0(Date, Site)) %>%
+      group_by(survey_event) %>%
+      mutate(sum=sum(Total)) %>%
+      filter(sum>0) %>%
+      dplyr::select(survey_event, DistKm, Location) %>%
+      distinct()
+    
+  # #create column for each habitat
+  # env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
+  # env$P <- ifelse(is.na(env$P), 0, 1)
+  # env$SS <- ifelse(is.na(env$SS), 0, 2)
+  # env$P <- as.numeric(env$P) #convert factor to numeric
+  # env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
+  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
+    
+  #convert survey event to rowname
+  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
+  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  
+  # #convert Habitat to numeric
+  # env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
+  # env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
+  #convert Location to numeric
+  env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
+  env$Location <- as.numeric(env$Location) #convert factor to numeric
+
+#Traits
+  
+  #create column of usable IDs to join
+  IDs <- abund %>%
+    gather(ID, sum) %>%
+    dplyr::select(ID) %>%
+    unique()
+  #create trait df with ID type as row and columns are fishing and dispersiveness
+  TR <- site_select %>%
+    filter(Habitat=="SS") %>%
+    group_by(ID) %>%
+    summarise(sum=sum(Total)) %>%
+    left_join(item_code, by="ID") %>%
+    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>% #remove items with 0 count
+    column_to_rownames(var="ID") #create rownames from ID
+  
+  #state variables to rename
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+  
+  #change Material to character
+  TR$Material <- as.character(TR$Material) 
+  
+  #set lesser used categories to 'Other'
+  TR$Material[TR$Material %in% var_change] = "Other" 
+
+  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
+  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
+  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
+
+y <- as.matrix(abund)
+X <- scale(as.matrix(env))
+TR <- TR
+
+# #Data long
+# yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
+#                 colnames(y), v.names = "y", timevar = "sp")
+# #id is the site (1:20), sp is the debris ID, y is the count
+# TR2 <- data.frame(sp = 1:62, TR)
+# 
+# datalong <- merge(yX, TR2, by = "sp")
+
+fit4th <- gllvm(y, X, TR, family="negative.binomial",
+                formula= y~(DistKm) +
+                  (DistKm) : (Dispersiveness + Fishing + Material))
+
+
+# fit4th2 <- gllvm(y, X, TR, family="negative.binomial",
+#                 formula= y~(Habitat + DistKm))
+
+# anova(fit4th, fit4th2)
+#p-value of 0.0197716 suggests that the model with traits is more appropriate. #Is this right? Reference below
+#https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13303
+#I reckon this is right because the QQplot without traits deviates from the line more
+
+fourth <- fit4th$fourth.corner
+a <- max( abs(fourth))
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), 
+                      xlab = "Environmental Variables", 
+                      ylab = "Debris traits",
+                      col.regions = colort(100), #use defined colour palette
+                      cex.lab = 1.3, #specify size of the label text
+                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
+                      scales = list(x = list(rot = 45))) #rotate text for clarity
+
+
+plot.4th
+
+summary(fourth)
+
+```
+
+```{r gllvm-set-up-separate-hab, warning=FALSE, message=FALSE, results="hide"}
+#Abundance
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+
+#Environment
+  #create survey event and filter zero sum surveys, 
+    env <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>%
+      group_by(survey_event) %>%
+      mutate(sum=sum(Total)) %>%
+      filter(sum>0) %>%
+      dplyr::select(survey_event, DistKm, Habitat, Location) %>%
+      distinct()
+    
+  #create column for each habitat
+  env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
+  env$P <- ifelse(is.na(env$P), 0, 1)
+  env$SS <- ifelse(is.na(env$SS), 0, 1)
+  # env$P <- as.numeric(env$P) #convert factor to numeric
+  # env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
+  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
+    
+  #convert survey event to rowname
+  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
+  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  
+  # #convert Habitat to numeric
+  env$P <- as.numeric(env$P) #convert factor to numeric
+  env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # convert Location to numeric
+  # env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
+  # env$Location <- as.numeric(env$Location) #convert factor to numeric
+
+#Traits
+  
+  #create column of usable IDs to join
+  IDs <- abund %>%
+    gather(ID, sum) %>%
+    dplyr::select(ID) %>%
+    unique()
+  #create trait df with ID type as row and columns are fishing and dispersiveness
+  TR <- site_select %>%
+    group_by(ID) %>%
+    summarise(sum=sum(Total)) %>%
+    left_join(item_code, by="ID") %>%
+    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>% #remove items with 0 count
+    column_to_rownames(var="ID") #create rownames from ID
+  
+  #state variables to rename
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+  
+  #change Material to character
+  TR$Material <- as.character(TR$Material) 
+  
+  #set lesser used categories to 'Other'
+  TR$Material[TR$Material %in% var_change] = "Other" 
+
+  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
+  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
+  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
+
+y <- as.matrix(abund)
+X <- scale(as.matrix(env))
+TR <- TR
+
+# #Data long
+# yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
+#                 colnames(y), v.names = "y", timevar = "sp")
+# #id is the site (1:20), sp is the debris ID, y is the count
+# TR2 <- data.frame(sp = 1:62, TR)
+# 
+# datalong <- merge(yX, TR2, by = "sp")
+
+fit4th <- gllvm(y, X, TR, family="negative.binomial",
+                formula= y~(P + SS + DistKm) +
+                  (P + SS + DistKm) : (Dispersiveness + Fishing + Material))
+
+coefplot(fit4th)
+
+
+# fit4th2 <- gllvm(y, X, TR, family="negative.binomial",
+#                 formula= y~(Habitat + DistKm))
+
+# anova(fit4th, fit4th2)
+#p-value of 0.0197716 suggests that the model with traits is more appropriate. #Is this right? Reference below
+#https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13303
+#I reckon this is right because the QQplot without traits deviates from the line more
+
+fourth <- fit4th$fourth.corner
+a <- max( abs(fourth))
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), 
+                      xlab = "Environmental Variables", 
+                      ylab = "Debris traits",
+                      col.regions = colort(100), #use defined colour palette
+                      cex.lab = 1.3, #specify size of the label text
+                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
+                      scales = list(x = list(rot = 45))) #rotate text for clarity
+
+
+plot.4th
+
+summary(fourth)
+
 ```
 
 ```{r wide-format, warning=FALSE, message=FALSE, results="hide"}
@@ -201,6 +599,7 @@ TR <- TR
 # 
 # plot(fit_wide)
 ```
+
 ```{r long-format, warning=FALSE, message=FALSE, results="hide"}
 yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
                 colnames(y), v.names = "y", timevar = "sp")
@@ -223,15 +622,15 @@ fit_allfixed <- gllvm(data=datalong,
                         (Habitat + DistKm + Location) * (Material + Dispersiveness + Fishing),
                       family = "negative.binomial")
 
-#call svg command to start the plot
-svg(file = "images/coefplot.svg",   # The directory you want to save the file in
-    width = 11, # The width of the plot in inches
-    height = 7) # The height of the plot in inches
-
-coefplot(fit_allfixed)
-
-# Step 3: Run dev.off() to create the file!
-dev.off()
+# #call svg command to start the plot
+# svg(file = "images/coefplot.svg",   # The directory you want to save the file in
+#     width = 11, # The width of the plot in inches
+#     height = 7) # The height of the plot in inches
+# 
+# coefplot(fit_allfixed)
+# 
+# # Step 3: Run dev.off() to create the file!
+# dev.off()
 
 anova(fit_env, fit_allfixed)
 
@@ -316,3 +715,5 @@ plot.4th
 # Step 3: Run dev.off() to create the file!
 dev.off()
 ```
+
+

@@ -238,7 +238,7 @@ dev.off()
 
 citation("stats")
 ```
-
+## glm fish
 ```{r glm-fish, warning=FALSE, message=FALSE}
 #create df to use for models
 mod_fish <- site_select %>%
@@ -652,8 +652,8 @@ m_gls  <- glmmTMB(Total ~ #Debris count
 # Predictors for 'other' materials are: Habitat, Coast
 
 nd_gls <- expand.grid(Habitat = unique(mod_gls$Habitat),
-                      DistKm = seq(from = min(mod_plas$DistKm),
-                               to = max(mod_plas$DistKm),
+                      DistKm = seq(from = min(mod_gls$DistKm),
+                               to = max(mod_gls$DistKm),
                                length=1000),
                   Location = NA,
                   Date = NA)
