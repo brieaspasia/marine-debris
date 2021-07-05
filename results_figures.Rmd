@@ -315,6 +315,20 @@ m_nonfish  <- glmmTMB(Total ~ #Debris count
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_nonfish)
 
+library(emmeans)
+emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(0.2,0.4)))
+
+#pier diff 3.05 - 4.28 (-1.23) at 1, 2.94 - 4.06 (-1.12) at 8
+#sedi diff 1.22 - 3.14 (-1.92) at 1, 1.91 - 3.43 (-1.52) at 8
+
+# DistKm = 1:
+#  contrast estimate    SE df t.ratio p.value
+#  P - SS      1.486 0.540 29 2.751   0.0101 
+# 
+# DistKm = 8:
+#  contrast estimate    SE df t.ratio p.value
+#  P - SS      0.829 0.441 29 1.877   0.0705 
+
 # Predictors for non-fishing related debris are: Habitat
 
 nd_nonfish <- expand.grid(Habitat = unique(mod_nonfish$Habitat),

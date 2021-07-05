@@ -24,7 +24,7 @@ library(lubridate) #date manipulation
 library(forcats) #working with factors
 library(tidyverse) #manipulating data
 library(knitr) #rmarkdown functions
-library(kableExtra) #table layouts
+# library(kableExtra) #table layouts
 library(magick) #image processing
 library(stats) #R stats functions
 library(broom) #create summaries from stats objects
@@ -33,8 +33,8 @@ library(MASS) #stats
 library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
-library(lattice) #fourth corner heatmap
-library(corrplot) #co-occurrence matrix
+# library(lattice) #fourth corner heatmap
+# library(corrplot) #co-occurrence matrix
 library(gclus) #co-occurrence matrix
 library(broom.mixed) #regression tables
 library(vegan) #ordination
@@ -350,12 +350,18 @@ mod_nonfish <- site_select %>%
               mutate(Location = as.factor(Location),
          Habitat = as.factor(Habitat))
 
-#GLM negative binomial with two variables and zero inflation
-# m_nonfish  <- glmmTMB(Total ~ #Debris count
-#                  Habitat * DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish)
+# GLM negative binomial with two variables and zero inflation
+m_nonfish  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_nonfish)
+
+library(emmeans)
+emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)))
+
+#pier diff 3.05 - 4.28 (-1.23) at 1, 2.94 - 4.06 (-1.12) at 8
+#sedi diff 1.22 - 3.14 (-1.92) at 1, 1.91 - 3.43 (-1.52) at 8
 
 m_nonfish  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
