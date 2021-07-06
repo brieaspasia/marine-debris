@@ -316,7 +316,7 @@ m_nonfish  <- glmmTMB(Total ~ #Debris count
                data = mod_nonfish)
 
 library(emmeans)
-emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(0.2,0.4)))
+emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)))
 
 #pier diff 3.05 - 4.28 (-1.23) at 1, 2.94 - 4.06 (-1.12) at 8
 #sedi diff 1.22 - 3.14 (-1.92) at 1, 1.91 - 3.43 (-1.52) at 8
@@ -352,7 +352,8 @@ nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
 
 p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) + 
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
+  ylim(0, 250)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -686,7 +687,8 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 
 p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
+  ylim(0, 200)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -772,8 +774,8 @@ m_met  <- glmmTMB(Total ~ #Debris count
 # Predictors for 'other' materials are: Habitat, Coast
 
 nd_met <- expand.grid(Habitat = unique(mod_met$Habitat),
-                      DistKm = seq(from = min(mod_plas$DistKm),
-                               to = max(mod_plas$DistKm),
+                      DistKm = seq(from = min(mod_met$DistKm),
+                               to = max(mod_met$DistKm),
                                length=1000),
                   Location = NA,
                   Date = NA)
@@ -792,7 +794,8 @@ nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
 
 p_met <- ggplot(nd_met, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
+  ylim(0, 200)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -801,9 +804,9 @@ p_met <- ggplot(nd_met, aes(y=Total, x=DistKm)) +
 
 p_met
 
-# svg("images/p_met.svg")
-# plot(p_met, height=7, width=7, units="in")
-# dev.off()
+svg("images/p_met.svg")
+plot(p_met, height=7, width=7, units="in")
+dev.off()
 
 # ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
 ```
@@ -1194,6 +1197,131 @@ svg(file = "images/plot4th.svg",   # The directory you want to save the file in
 plot(plot.4th)
 dev.off()
 ```
+
+```{r gllvm-set-up-separate-hab, warning=FALSE, message=FALSE, results="hide"}
+#Abundance
+  #create abundance dataframe with ID as columns and survey events as rows
+  abund_long <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
+    group_by(survey_event, ID) %>% 
+    summarise(sum=sum(Total)) %>% #total of each item type per survey event
+    dplyr::select(survey_event, ID, sum) %>%
+  group_by(ID) %>%
+  filter(sum>0) %>% #filter IDs that have no values across all surveys
+  ungroup()
+  
+  #convert to data wide
+  abund <- spread(abund_long, ID, sum) 
+  
+  #replace na values with 0
+  abund[is.na(abund)] <- 0
+  
+  #convert survey event to rowname
+  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
+  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
+
+#Environment
+  #create survey event and filter zero sum surveys, 
+    env <- site_select %>%
+    mutate(survey_event=paste0(Date, Site)) %>%
+      group_by(survey_event) %>%
+      mutate(sum=sum(Total)) %>%
+      filter(sum>0) %>%
+      dplyr::select(survey_event, DistKm, Habitat, Location) %>%
+      distinct()
+    
+  #create column for each habitat
+  env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
+  env$P <- ifelse(is.na(env$P), 0, 1)
+  env$SS <- ifelse(is.na(env$SS), 0, 1)
+  # env$P <- as.numeric(env$P) #convert factor to numeric
+  # env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
+  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
+    
+  #convert survey event to rowname
+  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
+  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
+  
+  # #convert Habitat to numeric
+  env$P <- as.numeric(env$P) #convert factor to numeric
+  env$SS <- as.numeric(env$SS) #convert factor to numeric
+  # convert Location to numeric
+  # env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
+  # env$Location <- as.numeric(env$Location) #convert factor to numeric
+
+#Traits
+  
+  #create column of usable IDs to join
+  IDs <- abund %>%
+    gather(ID, sum) %>%
+    dplyr::select(ID) %>%
+    unique()
+  #create trait df with ID type as row and columns are fishing and dispersiveness
+  TR <- site_select %>%
+    group_by(ID) %>%
+    summarise(sum=sum(Total)) %>%
+    left_join(item_code, by="ID") %>%
+    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
+    inner_join(IDs, by="ID") %>% #remove items with 0 count
+    column_to_rownames(var="ID") #create rownames from ID
+  
+  #state variables to rename
+  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
+  
+  #change Material to character
+  TR$Material <- as.character(TR$Material) 
+  
+  #set lesser used categories to 'Other'
+  TR$Material[TR$Material %in% var_change] = "Other" 
+
+  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
+  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
+  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
+
+y <- as.matrix(abund)
+X <- scale(as.matrix(env))
+TR <- TR
+
+# #Data long
+# yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
+#                 colnames(y), v.names = "y", timevar = "sp")
+# #id is the site (1:20), sp is the debris ID, y is the count
+# TR2 <- data.frame(sp = 1:62, TR)
+# 
+# datalong <- merge(yX, TR2, by = "sp")
+
+fit4th <- gllvm(y, X, TR, family="negative.binomial",
+                formula= y~(P + SS + DistKm) +
+                  (P + SS + DistKm) : (Dispersiveness + Fishing + Material))
+
+coefplot(fit4th)
+
+
+# fit4th2 <- gllvm(y, X, TR, family="negative.binomial",
+#                 formula= y~(Habitat + DistKm))
+
+# anova(fit4th, fit4th2)
+#p-value of 0.0197716 suggests that the model with traits is more appropriate. #Is this right? Reference below
+#https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13303
+#I reckon this is right because the QQplot without traits deviates from the line more
+
+fourth <- fit4th$fourth.corner
+a <- max( abs(fourth))
+colort <- colorRampPalette(c("blue", "white", "red"))
+plot.4th <- levelplot((as.matrix(fourth)), 
+                      xlab = "Environmental Variables", 
+                      ylab = "Debris traits",
+                      col.regions = colort(100), #use defined colour palette
+                      cex.lab = 1.3, #specify size of the label text
+                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
+                      scales = list(x = list(rot = 45))) #rotate text for clarity
+
+
+plot.4th
+
+summary(fourth)
+
 
 
 
