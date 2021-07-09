@@ -353,12 +353,11 @@ nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
 p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) + 
   geom_line(aes(col=Habitat)) +
   geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
-  ylim(0, 250)
-   # theme(legend.position = "none",
-   #      panel.grid = element_blank(),
-   #      axis.title = element_blank(),
-   #      axis.text = element_blank(),
-   #      panel.background = element_blank()) 
+   theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        panel.background = element_blank())
 
 p_nonfish
 
@@ -368,229 +367,6 @@ p_nonfish
 
 svg("images/p_nonfish.svg")
 plot(p_nonfish, height=7, width=7, units="in")
-dev.off()
-
-```
-
-```{r glm-nonfish-drop, warning=FALSE, message=FALSE}
-#create df to use for models
-mod_nonfish_drop <- site_select %>%
-  filter(Fishing=="Non-Fishing") %>% #nonfishing debris
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-m_nonfish_drop  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_nonfish_drop)
-
-# Predictors for non-fishing related debris are: Habitat
-
-nd_nonfish_drop <- expand.grid(Habitat = unique(mod_nonfish_drop$Habitat),
-                          # DistKm = seq(from = min(mod_nonfish$DistKm),
-                          #      to = max(mod_nonfish$DistKm),
-                          #      length=1000),
-                  Location = NA,
-                  Date = NA)
-
-
-pred_nonfish_drop <- predict(object = m_nonfish_drop,
-                         newdata = nd_nonfish_drop,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_nonfish_drop$Total <- pred_nonfish_drop$fit
-nd_nonfish_drop$SE_upper <- pred_nonfish_drop$fit + pred_nonfish_drop$se.fit
-nd_nonfish_drop$SE_lower <- pred_nonfish_drop$fit - pred_nonfish_drop$se.fit
-
-
-p_nonfish_drop <- ggplot(nd_nonfish_drop, aes(y=Total, x=Habitat)) + 
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90))
-   # theme(legend.position = "none",
-   #      panel.grid = element_blank(),
-   #      axis.title = element_blank(),
-   #      axis.text = element_blank(),
-   #      panel.background = element_blank()) 
-
-p_nonfish_drop
-
-# ggsave(filename = "images/p_nonfish.svg", plot = p_nonfish, device="svg", height=7, width=7, units="in")
-
-svg("images/p_nonfish_drop.svg")
-plot(p_nonfish_drop, height=7, width=7, units="in")
-dev.off()
-
-```
-```{r glm-F2, warning=FALSE, message=FALSE}
-#create df of fishing line to use for models
-mod_F2 <- site_select %>%
-  filter(ID=="F2") %>% #fishing line
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-m_F2  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #distance from harbour mouth
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_F2) 
-# Predictors are: Habitat, DistKm
-
-nd_F2 <- expand.grid(Habitat = unique(mod_F2$Habitat),
-                          DistKm = seq(from = min(mod_F2$DistKm),
-                               to = max(mod_F2$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-pred_F2 <- predict(object = m_F2,
-                         newdata = nd_F2,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_F2$Total <- pred_F2$fit
-nd_F2$SE_upper <- pred_F2$fit + pred_F2$se.fit
-nd_F2$SE_lower <- pred_F2$fit - pred_F2$se.fit
-
-#plot the predicted means
-
-p_F2 <- ggplot(nd_F2, aes(y=Total, x=DistKm)) +
-  geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
-   # theme(legend.position = "none",
-   #      panel.grid = element_blank(),
-   #      axis.title = element_blank(),
-   #      axis.text = element_blank(),
-   #      panel.background = element_blank()) 
-
-p_F2
-
-# ggsave(filename = "images/p_F2.svg", plot = p_F2, device="svg", height=7, width=7, units="in")
-
-# svg("images/p_F2.svg")
-# plot(p_F2, height=7, width=7, units="in")
-# dev.off()
-
-```
-## Testing glass bottles debris type
-```{r glm-btl_drop, warning=FALSE, message=FALSE}
-#create df of glass bottles to use for models
-mod_btl <- site_select %>%
-  filter(ID=="G1") %>% #glass bottles
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-m_btl_drop  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat and distance
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_btl)
-
-
-# Predictors for glass bottles are: Habitat, Coast
-
-nd_btl_drop <- expand.grid(Habitat = unique(mod_btl$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_btl_drop <- predict(object = m_btl_drop,
-                         newdata = nd_btl_drop,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_btl_drop$Total <- pred_btl_drop$fit
-nd_btl_drop$SE_upper <- pred_btl_drop$fit + pred_btl_drop$se.fit
-nd_btl_drop$SE_lower <- pred_btl_drop$fit - pred_btl_drop$se.fit
-
-#plot the predicted means
-
-p_btl_drop <- ggplot(nd_btl_drop, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) 
-   # theme(legend.position = "none",
-   #      panel.grid = element_blank(),
-   #      axis.title = element_blank(),
-   #      axis.text = element_blank(),
-   #      panel.background = element_blank()) 
-
-p_btl_drop
-
-# ggsave(filename = "images/p_btl_drop.svg", plot = p_btl_drop, device="svg", height=7, width=7, units="in")
-
-# svg("images/p_btl_drop.svg")
-# plot(p_btl_drop, height=7, width=7, units="in")
-# dev.off()
-
-```
-
-```{r glm-btl, warning=FALSE, message=FALSE}
-#create df of glass bottles to use for models
-mod_btl <- site_select %>%
-  filter(ID=="G1") %>% #glass bottles
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-m_btl  <- glmmTMB(Total ~ #Debris count
-                 Habitat*DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_btl)
-
-# Predictors for glass bottles are: Habitat, Coast
-
-nd_btl <- expand.grid(Habitat = unique(mod_btl$Habitat),
-                              DistKm = seq(from = min(mod_F2$DistKm),
-                               to = max(mod_F2$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-pred_btl <- predict(object = m_btl,
-                         newdata = nd_btl,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_btl$Total <- pred_btl$fit
-nd_btl$SE_upper <- pred_btl$fit + pred_btl$se.fit
-nd_btl$SE_lower <- pred_btl$fit - pred_btl$se.fit
-
-#plot the predicted means
-
-p_btl <- ggplot(nd_btl, aes(y=Total, x=DistKm)) +
-  geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2)
-   # theme(legend.position = "none",
-   #      panel.grid = element_blank(),
-   #      axis.title = element_blank(),
-   #      axis.text = element_blank(),
-   #      panel.background = element_blank()) 
-
-p_btl
-
-# ggsave(filename = "images/p_btl.svg", plot = p_btl, device="svg", height=7, width=7, units="in")
-
-svg("images/p_btl.svg")
-plot(p_btl, height=7, width=7, units="in")
 dev.off()
 
 ```
@@ -688,7 +464,6 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
   geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
-  ylim(0, 200)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -705,57 +480,7 @@ dev.off()
 
 ```
 
-```{r glm-glsmat_drop, warning=FALSE, message=FALSE}
-#create df of all misc materials
-mod_gls <- site_select %>%
-  filter(Material=="Glass") %>% #glass
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) 
 
-
-m_gls_drop  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_gls)
-
-# Predictors for 'other' materials are: Habitat, Coast
-
-nd_gls_drop <- expand.grid(Habitat = unique(mod_gls$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_gls_drop <- predict(object = m_gls_drop,
-                         newdata = nd_gls_drop,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_gls_drop$Total <- pred_gls_drop$fit
-nd_gls_drop$SE_upper <- pred_gls_drop$fit + pred_gls_drop$se.fit
-nd_gls_drop$SE_lower <- pred_gls_drop$fit - pred_gls_drop$se.fit
-
-#plot the predicted means
-
-p_gls_drop <- ggplot(nd_gls_drop, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-  ylim(0, 30) +
-   theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank())
-
-p_gls_drop
-
-# ggsave(filename = "images/p_gls_drop.svg", plot = p_gls_drop, device="svg", height=7, width=7, units="in")
-
-svg("images/p_gls_drop.svg")
-plot(p_gls_drop, height=7, width=7, units="in")
-dev.off()
-
-```
 # glm metal
 ```{r glm-metmat, warning=FALSE, message=FALSE}
 #create df of all misc materials
@@ -795,7 +520,7 @@ nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
 p_met <- ggplot(nd_met, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
   geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
-  ylim(0, 200)
+  ylim(0, 40)
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -811,56 +536,6 @@ dev.off()
 # ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
 ```
 
-```{r glm-metmat, warning=FALSE, message=FALSE}
-#create df of all misc materials
-mod_met <- site_select %>%
-  filter(Material=="Metal") %>% #glass
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) 
-
-# #GLM negative binomial with two variables and zero inflation
-m_met_drop  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_met)
-
-# Predictors for 'other' materials are: Habitat, Coast
-
-nd_met_drop <- expand.grid(Habitat = unique(mod_met$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_met_drop <- predict(object = m_met_drop,
-                         newdata = nd_met_drop,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_met_drop$Total <- pred_met_drop$fit
-nd_met_drop$SE_upper <- pred_met_drop$fit + pred_met_drop$se.fit
-nd_met_drop$SE_lower <- pred_met_drop$fit - pred_met_drop$se.fit
-
-#plot the predicted means
-
-p_met_drop <- ggplot(nd_met_drop, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-  ylim(0, 30) 
-   # theme(legend.position = "none",
-   #      panel.grid = element_blank(),
-   #      axis.title = element_blank(),
-   #      axis.text = element_blank(),
-   #      panel.background = element_blank())
-
-p_met_drop
-
-# svg("images/p_met_drop.svg")
-# plot(p_met_drop, height=7, width=7, units="in")
-# dev.off()
-
-# ggsave(filename = "images/p_met_drop.svg", plot = p_met_drop, device="svg", height=7, width=7, units="in")
-```
 
 ## Ordination
 ```{r vegan}
@@ -1066,263 +741,12 @@ dev.off()
 # dev.off()
 
 ```
-## Fourth corner analysis
+## gllvm analysis
 Determining the significance of environmental traits and debris attributes.
-```{r gllvm-set-up-1or2, warning=FALSE, message=FALSE, results="hide"}
-#Abundance
-  #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select %>%
-    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, ID) %>% 
-    summarise(sum=sum(Total)) %>% #total of each item type per survey event
-    dplyr::select(survey_event, ID, sum) %>%
-  group_by(ID) %>%
-  filter(sum>0) %>% #filter IDs that have no values across all surveys
-  ungroup()
-  
-  #convert to data wide
-  abund <- spread(abund_long, ID, sum) 
-  
-  #replace na values with 0
-  abund[is.na(abund)] <- 0
-  
-  #convert survey event to rowname
-  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
-  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
 
-#Environment
-  #create survey event and filter zero sum surveys, 
-    env <- site_select %>%
-    mutate(survey_event=paste0(Date, Site)) %>%
-      group_by(survey_event) %>%
-      mutate(sum=sum(Total)) %>%
-      filter(sum>0) %>%
-      dplyr::select(survey_event, Habitat, DistKm, Location) %>%
-      distinct()
-    
-  #convert survey event to rowname
-  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
-  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
-  #convert Habitat to numeric
-  env$Habitat <- as.factor(env$Habitat) #convert character to factor with 2 levels
-  env$Habitat <- as.numeric(env$Habitat) #convert factor to numeric
-  #convert Location to numeric
-  env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
-  env$Location <- as.numeric(env$Location) #convert factor to numeric
-
-#Traits
-  
-  #create column of usable IDs to join
-  IDs <- abund %>%
-    gather(ID, sum) %>%
-    dplyr::select(ID) %>%
-    unique()
-  #create trait df with ID type as row and columns are fishing and dispersiveness
-  TR <- site_select %>%
-    group_by(ID) %>%
-    summarise(sum=sum(Total)) %>%
-    left_join(item_code, by="ID") %>%
-    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
-    inner_join(IDs, by="ID") %>% #remove items with 0 count
-    column_to_rownames(var="ID") #create rownames from ID
-  
-  #state variables to rename
-  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
-  
-  #change Material to character
-  TR$Material <- as.character(TR$Material) 
-  
-  #set lesser used categories to 'Other'
-  TR$Material[TR$Material %in% var_change] = "Other" 
-
-  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
-  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
-  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
-
-y <- as.matrix(abund)
-X <- scale(as.matrix(env))
-TR <- TR
-
-#Data long
-yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
-                colnames(y), v.names = "y", timevar = "sp")
-#id is the site (1:20), sp is the debris ID, y is the count
-TR2 <- data.frame(sp = 1:62, TR)
-
-datalong <- merge(yX, TR2, by = "sp")
-```
-
+Coefficient plot shows estimated coefficients (ticks) and their 95% confidence interval (lines). that there are a few significant variables including Habitat affected by fishing, habitat on its own, and the dispersiveness category of unencumbered drift.  
 
 Here we see that nothing is interacting significantly with distance to harbour mouth, however both fishing and encumbered drift are interacting with habitat significantly.
-
-# Fourth corner model
-Coefficient plot shows estimated coefficients (ticks) and their 95% confidence interval (lines). that there are a few significant variables including Habitat affected by fishing, habitat on its own, and the dispersiveness category of unencumbered drift.  
-```{r 4th-corner-heatmap, fig.cap="Figure 5: Fourth corner heatmap"}
-# Model with environmental and trait variables as predictors
-fit_allfixed <- gllvm(data=datalong, 
-                      formula = y ~ (0 + Habitat + DistKm) + 
-                        (Habitat + DistKm) * (Material + Dispersiveness + Fishing),
-                      family = "negative.binomial")
-
-summary(fit_allfixed)
-
-coefplot(fit_allfixed)
-
-#call svg command to start the plot
-svg(file = "images/coefplot.svg",   # The directory you want to save the file in
-    width = 11, # The width of the plot in inches
-    height = 7) # The height of the plot in inches
-coefplot(fit_allfixed)
-dev.off()
-
-t <- fit_allfixed$data
-
-png(file = "images/coefplot.png")  # The directory you want to save the file in
-coefplot(fit_allfixed, cex.ylab = .8)
-dev.off()
-
-fourth <- fit_allfixed$fourth.corner
-a <- max( abs(fourth) )
-colort <- colorRampPalette(c("blue", "white", "red"))
-plot.4th <- levelplot((as.matrix(fourth)), xlab = "Environmental Variables", 
-                      ylab = "Debris traits", col.regions = colort(100), cex.lab = 1.3, 
-                      at = seq(-a, a, length = 100), scales = list(x = list(rot = 45)))
-
-plot.4th
-
-#call svg command to start the plot
-svg(file = "images/plot4th.svg",   # The directory you want to save the file in
-    width = 11, # The width of the plot in inches
-    height = 7) # The height of the plot in inches
-plot(plot.4th)
-dev.off()
-```
-
-```{r gllvm-set-up-separate-hab, warning=FALSE, message=FALSE, results="hide"}
-#Abundance
-  #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select %>%
-    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, ID) %>% 
-    summarise(sum=sum(Total)) %>% #total of each item type per survey event
-    dplyr::select(survey_event, ID, sum) %>%
-  group_by(ID) %>%
-  filter(sum>0) %>% #filter IDs that have no values across all surveys
-  ungroup()
-  
-  #convert to data wide
-  abund <- spread(abund_long, ID, sum) 
-  
-  #replace na values with 0
-  abund[is.na(abund)] <- 0
-  
-  #convert survey event to rowname
-  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
-  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
-
-#Environment
-  #create survey event and filter zero sum surveys, 
-    env <- site_select %>%
-    mutate(survey_event=paste0(Date, Site)) %>%
-      group_by(survey_event) %>%
-      mutate(sum=sum(Total)) %>%
-      filter(sum>0) %>%
-      dplyr::select(survey_event, DistKm, Habitat, Location) %>%
-      distinct()
-    
-  #create column for each habitat
-  env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
-  env$P <- ifelse(is.na(env$P), 0, 1)
-  env$SS <- ifelse(is.na(env$SS), 0, 1)
-  # env$P <- as.numeric(env$P) #convert factor to numeric
-  # env$SS <- as.numeric(env$SS) #convert factor to numeric
-  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
-  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
-    
-  #convert survey event to rowname
-  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
-  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
-  
-  # #convert Habitat to numeric
-  env$P <- as.numeric(env$P) #convert factor to numeric
-  env$SS <- as.numeric(env$SS) #convert factor to numeric
-  # convert Location to numeric
-  # env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
-  # env$Location <- as.numeric(env$Location) #convert factor to numeric
-
-#Traits
-  
-  #create column of usable IDs to join
-  IDs <- abund %>%
-    gather(ID, sum) %>%
-    dplyr::select(ID) %>%
-    unique()
-  #create trait df with ID type as row and columns are fishing and dispersiveness
-  TR <- site_select %>%
-    group_by(ID) %>%
-    summarise(sum=sum(Total)) %>%
-    left_join(item_code, by="ID") %>%
-    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
-    inner_join(IDs, by="ID") %>% #remove items with 0 count
-    column_to_rownames(var="ID") #create rownames from ID
-  
-  #state variables to rename
-  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
-  
-  #change Material to character
-  TR$Material <- as.character(TR$Material) 
-  
-  #set lesser used categories to 'Other'
-  TR$Material[TR$Material %in% var_change] = "Other" 
-
-  TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
-  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
-  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
-
-y <- as.matrix(abund)
-X <- scale(as.matrix(env))
-TR <- TR
-
-# #Data long
-# yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
-#                 colnames(y), v.names = "y", timevar = "sp")
-# #id is the site (1:20), sp is the debris ID, y is the count
-# TR2 <- data.frame(sp = 1:62, TR)
-# 
-# datalong <- merge(yX, TR2, by = "sp")
-
-fit4th <- gllvm(y, X, TR, family="negative.binomial",
-                formula= y~(P + SS + DistKm) +
-                  (P + SS + DistKm) : (Dispersiveness + Fishing + Material))
-
-coefplot(fit4th)
-
-
-# fit4th2 <- gllvm(y, X, TR, family="negative.binomial",
-#                 formula= y~(Habitat + DistKm))
-
-# anova(fit4th, fit4th2)
-#p-value of 0.0197716 suggests that the model with traits is more appropriate. #Is this right? Reference below
-#https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13303
-#I reckon this is right because the QQplot without traits deviates from the line more
-
-fourth <- fit4th$fourth.corner
-a <- max( abs(fourth))
-colort <- colorRampPalette(c("blue", "white", "red"))
-plot.4th <- levelplot((as.matrix(fourth)), 
-                      xlab = "Environmental Variables", 
-                      ylab = "Debris traits",
-                      col.regions = colort(100), #use defined colour palette
-                      cex.lab = 1.3, #specify size of the label text
-                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
-                      scales = list(x = list(rot = 45))) #rotate text for clarity
-
-
-plot.4th
-
-summary(fourth)
-
-```
 
 ```{r gllvm-set-up-1or0, warning=FALSE, message=FALSE, results="hide"}
 #Abundance
@@ -1356,17 +780,17 @@ summary(fourth)
       dplyr::select(survey_event, Habitat, DistKm, Location) %>%
       distinct() %>%
       ungroup() %>%
-      mutate(hab = ifelse(Habitat=="P", 1, 0))
+      mutate(Pier = ifelse(Habitat=="P", 1, 0))
   
     
   #convert survey event to rowname
   length(unique(env$survey_event)) == nrow(env) #checking for duplicates
   env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
   #convert Hab to numeric
-  env$hab <- as.numeric(env$hab) #convert factor to numeric
+  env$Pier <- as.numeric(env$Pier) #convert factor to numeric
 
   env <- env %>%
-    dplyr::select(DistKm, hab)
+    dplyr::select(DistKm, Pier)
 
 #Traits
   
@@ -1402,135 +826,10 @@ X <- scale(as.matrix(env))
 TR <- TR
 
 fit4th <- gllvm(y, X, TR, family="negative.binomial",
-                formula= y~(hab + DistKm) +
-                  (hab + DistKm) : (Dispersiveness + Fishing + Material))
+                formula= y~(Pier + DistKm) +
+                  (Pier + DistKm) : (Dispersiveness + Fishing + Material))
 
-coefplot(fit4th)
-
-fourth <- fit4th$fourth.corner
-a <- max( abs(fourth))
-colort <- colorRampPalette(c("blue", "white", "red"))
-plot.4th <- levelplot((as.matrix(fourth)), 
-                      xlab = "Environmental Variables", 
-                      ylab = "Debris traits",
-                      col.regions = colort(100), #use defined colour palette
-                      cex.lab = 1.3, #specify size of the label text
-                      at = seq(-a, a, length = 100), #makes heat scale equal both sides
-                      scales = list(x = list(rot = 45))) #rotate text for clarity
-
-
-plot.4th
-
-summary(fourth)
-```
-```{r gllvm-set-up-separateHab-contTraits, warning=FALSE, message=FALSE, results="hide"}
-#Abundance
-  #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select %>%
-    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, ID) %>% 
-    summarise(sum=sum(Total)) %>% #total of each item type per survey event
-    dplyr::select(survey_event, ID, sum) %>%
-  group_by(ID) %>%
-  filter(sum>0) %>% #filter IDs that have no values across all surveys
-  ungroup()
-  
-  #convert to data wide
-  abund <- spread(abund_long, ID, sum) 
-  
-  #replace na values with 0
-  abund[is.na(abund)] <- 0
-  
-  #convert survey event to rowname
-  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
-  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
-
-#Environment
-  #create survey event and filter zero sum surveys, 
-    env <- site_select %>%
-    mutate(survey_event=paste0(Date, Site)) %>%
-      group_by(survey_event) %>%
-      mutate(sum=sum(Total)) %>%
-      filter(sum>0) %>%
-      dplyr::select(survey_event, DistKm, Habitat, Location) %>%
-      distinct()
-    
-  #create column for each habitat
-  env <- env %>% pivot_wider(names_from=Habitat, values_from=Location)
-  env$P <- ifelse(is.na(env$P), 0, 1)
-  env$SS <- ifelse(is.na(env$SS), 0, 1)
-  # env$P <- as.numeric(env$P) #convert factor to numeric
-  # env$SS <- as.numeric(env$SS) #convert factor to numeric
-  # env$P <- ifelse(is.na(env$P), env$SS, env$P)
-  # env$SS <- ifelse(is.na(env$SS), env$P, env$SS)
-    
-  #convert survey event to rowname
-  length(unique(env$survey_event)) == nrow(env) #checking for duplicates
-  env <- column_to_rownames(env, var="survey_event") #create rownames from survey event
-  
-  # #convert Habitat to numeric
-  env$P <- as.numeric(env$P) #convert factor to numeric
-  env$SS <- as.numeric(env$SS) #convert factor to numeric
-  # convert Location to numeric
-  # env$Location <- as.factor(env$Location) #convert character to factor with 2 levels
-  # env$Location <- as.numeric(env$Location) #convert factor to numeric
-
-#Traits
-  
-  #create column of usable IDs to join
-  IDs <- abund %>%
-    gather(ID, sum) %>%
-    dplyr::select(ID) %>%
-    unique()
-  #create trait df with ID type as row and columns are fishing and dispersiveness
-  TR <- site_select %>%
-    group_by(ID) %>%
-    summarise(sum=sum(Total)) %>%
-    left_join(item_code, by="ID") %>%
-    dplyr::select(Material, ID, Dispersiveness, Fishing) %>%
-    inner_join(IDs, by="ID") %>% #remove items with 0 count
-    column_to_rownames(var="ID") #create rownames from ID
-  
-  #state variables to rename
-  var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "") 
-  
-  #change Material to character
-  TR$Material <- as.character(TR$Material) 
-  
-  #set lesser used categories to 'Other'
-  TR$Material[TR$Material %in% var_change] = "Other" 
-
-  # TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 3 levels
-  TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
-  TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
-
-
-y <- as.matrix(abund)
-X <- scale(as.matrix(env))
-TR <- TR
-
-# #Data long
-# yX <- reshape(data.frame(cbind(y, X)), direction = "long", varying =
-#                 colnames(y), v.names = "y", timevar = "sp")
-# #id is the site (1:20), sp is the debris ID, y is the count
-# TR2 <- data.frame(sp = 1:62, TR)
-# 
-# datalong <- merge(yX, TR2, by = "sp")
-
-fit4th <- gllvm(y, X, TR, family="negative.binomial",
-                formula= y~(P + SS + DistKm) +
-                  (P + SS + DistKm) : (Fishing + Material))
-
-coefplot(fit4th)
-
-
-# fit4th2 <- gllvm(y, X, TR, family="negative.binomial",
-#                 formula= y~(Habitat + DistKm))
-
-# anova(fit4th, fit4th2)
-#p-value of 0.0197716 suggests that the model with traits is more appropriate. #Is this right? Reference below
-#https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13303
-#I reckon this is right because the QQplot without traits deviates from the line more
+coefplot(fit4th, cex.ylab = .30)
 
 fourth <- fit4th$fourth.corner
 a <- max( abs(fourth))
@@ -1545,7 +844,18 @@ plot.4th <- levelplot((as.matrix(fourth)),
 
 
 plot.4th
+coef
 
 summary(fourth)
 
+png(file = "images/coefplot.png")  # The directory you want to save the file in
+coefplot(fit4th, cex.ylab = .6)
+dev.off()
+
+#call svg command to start the plot
+svg(file = "images/plot4th.svg",   # The directory you want to save the file in
+    width = 11, # The width of the plot in inches
+    height = 7) # The height of the plot in inches
+plot(plot.4th)
+dev.off()
 ```
