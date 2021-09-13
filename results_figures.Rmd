@@ -7,8 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
-sessionInfo()
 ```
 
 ```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
@@ -32,17 +30,6 @@ library(mvabund) #for multivariate stats
 library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
 library(vegan)
-
-packages <- c("ggplot2", "ggthemes", "hrbrthemes", "lubridate", "forcats", "tidyverse", "knitr", "magick", "stats", "broom", "car", "MASS", "lme4", "DHARMa", "glmmTMB", "mvabund", "gllvm", "lattice", "vegan")
-
-# Install packages not yet installed
-installed_packages <- packages %in% rownames(installed.packages())
-if (any(installed_packages == FALSE)) {
-  install.packages(packages[!installed_packages])
-}
-
-# Packages loading
-invisible(lapply(packages, library, character.only = TRUE))
 ```
 
 # Site selection
@@ -248,7 +235,190 @@ plot(p_hab, height=7, width=12, units="in")
 dev.off()
 
 citation("stats")
+
+drop1(m_hab, test="Chisq") #interaction p=0.005621 **
 ```
+## drop1 tables
+```{r drop-levels-item}
+options(scipen = 999)
+
+top5 <- site_select %>%
+  group_by(Label) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(5, sum)
+
+#create vector from top 5 items
+top5 <- top5$Label
+top5 <- unlist(top5)
+
+#All top + items of interest
+top_txt <- site_select %>%
+  filter(Label %in% top5) %>%
+  mutate(Label = as.factor(Label)) %>%
+  distinct(Label)%>%
+  pull(Label) %>% 
+  droplevels()
+
+drop1_interaction = purrr::map_df(top_txt, function(x){
+  
+  temp_df <- site_select %>%
+  filter(Label == paste0(x)) %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Label = x)
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+d <- drop1(m_temp, test="Chisq")
+d$Label = x
+return(d)
+ })
+
+drop1_interaction <- drop1_interaction %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)')
+
+drop1_main = purrr::map_df(top_txt, function(x){
+  
+  temp_df <- site_select %>%
+  filter(Label == paste0(x)) %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Label = x)
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat + DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+d <- drop1(m_temp, test="Chisq")
+d$Label = x
+return(d)
+ })
+
+drop1_main <- drop1_main %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)')
+
+drop1_items <- rbind(drop1_interaction, drop1_main)
+write.csv(drop1_items,"drop1_items.csv", row.names = T)
+```
+
+```{r drop-levels-material}
+options(scipen = 999)
+
+top_mat <- site_select %>%
+  group_by(Material) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(8, sum)
+
+#create vector from top 5 items
+top_mat <- top_mat$Material
+top_mat <- unlist(top_mat)
+
+#All top + items of interest
+top_txt <- site_select %>%
+  filter(Material %in% top_mat) %>%
+  mutate(Material = as.factor(Material)) %>%
+  distinct(Material)%>%
+  pull(Material) %>% 
+  droplevels()
+
+drop1_interaction = purrr::map_df(top_txt, function(x){
+  
+  temp_df <- site_select %>%
+  filter(Material == paste0(x)) %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Material = x)
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+d <- drop1(m_temp, test="Chisq")
+d$Material = x
+return(d)
+ })
+
+drop1_interaction <- drop1_interaction %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)')
+
+drop1_main = purrr::map_df(top_txt, function(x){
+  
+  temp_df <- site_select %>%
+  filter(Label == paste0(x)) %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Label = x)
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat + DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+d <- drop1(m_temp, test="Chisq")
+d$Label = x
+return(d)
+ })
+
+drop1_main <- drop1_main %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)')
+
+drop1_items <- rbind(drop1_interaction, drop1_main)
+write.csv(drop1_items,"drop1_items.csv", row.names = T)
+
+
+  
+  temp_df <- site_select %>%
+  filter(Material == "Brick or Cement") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+drop1(m_temp, test="Chisq")
+
+top_mat
+
+```
+
 ## glm fish
 ```{r glm-fish, warning=FALSE, message=FALSE}
 #create df to use for models
