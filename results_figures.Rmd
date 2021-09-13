@@ -32,6 +32,17 @@ library(mvabund) #for multivariate stats
 library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
 library(vegan)
+
+packages <- c("ggplot2", "ggthemes", "hrbrthemes", "lubridate", "forcats", "tidyverse", "knitr", "magick", "stats", "broom", "car", "MASS", "lme4", "DHARMa", "glmmTMB", "mvabund", "gllvm", "lattice", "vegan")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
 ```
 
 # Site selection
