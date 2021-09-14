@@ -318,8 +318,66 @@ drop1_items <- rbind(drop1_interaction, drop1_main)
 write.csv(drop1_items,"drop1_items.csv", row.names = T)
 ```
 
+
+```{r drop-levels-fish}
+options(scipen = 999)
+
+ temp_df <- site_select %>%
+  filter(Fishing == "Fishing") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+drop1(m_temp, test="Chisq") #Fishing: Habitat:DistKm  1 257.93 6.6198  0.01008 *
+
+temp_df <- site_select %>%
+  filter(Fishing == "Non-Fishing") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+drop1(m_temp, test="Chisq")
+
+temp_df <- site_select %>%
+  filter(Fishing == "Non-Fishing") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat + DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+drop1(m_temp, test="Chisq")
+```
+
 ```{r drop-levels-material}
 options(scipen = 999)
+
+site_select$Material[site_select$Material %in% var_change] = "Other" 
 
 top_mat <- site_select %>%
   group_by(Material) %>%
@@ -332,14 +390,13 @@ top_mat <- top_mat$Material
 top_mat <- unlist(top_mat)
 
 #All top + items of interest
-top_txt <- site_select %>%
-  filter(Material %in% top_mat) %>%
+txt <- site_select %>%
   mutate(Material = as.factor(Material)) %>%
   distinct(Material)%>%
   pull(Material) %>% 
   droplevels()
 
-drop1_interaction = purrr::map_df(top_txt, function(x){
+drop1_interaction = purrr::map_df(txt, function(x){
   
   temp_df <- site_select %>%
   filter(Material == paste0(x)) %>%
@@ -366,16 +423,16 @@ drop1_interaction <- drop1_interaction %>%
   filter(LRT != "NA") %>%
   rename(p.value = 'Pr(>Chi)')
 
-drop1_main = purrr::map_df(top_txt, function(x){
+drop1_main = purrr::map_df(txt, function(x){
   
   temp_df <- site_select %>%
-  filter(Label == paste0(x)) %>%
+  filter(Material == paste0(x)) %>%
   group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
   mutate(Location = as.factor(Location),
          Habitat = as.factor(Habitat),
-         Label = x)
+         Material = x)
  
  #create model
   m_temp  <- glmmTMB(Total ~ #Debris count
@@ -385,7 +442,7 @@ drop1_main = purrr::map_df(top_txt, function(x){
                data = temp_df)
  
 d <- drop1(m_temp, test="Chisq")
-d$Label = x
+d$Material = x
 return(d)
  })
 
@@ -399,7 +456,7 @@ write.csv(drop1_items,"drop1_items.csv", row.names = T)
 
   
   temp_df <- site_select %>%
-  filter(Material == "Brick or Cement") %>%
+  filter(Material == "Glass") %>%
   group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
@@ -414,8 +471,6 @@ write.csv(drop1_items,"drop1_items.csv", row.names = T)
                data = temp_df)
  
 drop1(m_temp, test="Chisq")
-
-top_mat
 
 ```
 
