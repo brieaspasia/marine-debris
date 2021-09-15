@@ -35,74 +35,72 @@ library(vegan)
 # Site selection
 10 sites at 5 locations were surveyed between 3-5 times each during summer 2019-2020.
 ```{r create-site-select}
-#read in processed survey data
-data <- read.csv(file="data/all_data.csv", 
-                 header=T, sep=",", 
-                 fileEncoding="UTF-8-BOM") #removes special characters
+#Site selection
 
-data$Date <- dmy(data$Date) 
-data$Notes <- as.character(data$Notes)
-
-#keep only unsw surveys and sites with public piers and >2 survey rounds
-site_select <- data %>%
-  filter(Team=="UNSW" & 
-           Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
-  dplyr::select(-Habitat2, -Fragment, -Whole)
-
-#create a df for survey count per site
-sampling_dates <- data %>%
-  group_by(Location) %>%
-  filter(Team=="UNSW") %>%
-  count(Date)
-
-#take away n
-sampling_dates$n <- NULL
-
-#create a column for survey count per site
-sampling_dates <- sampling_dates %>%
-  count(Location) %>%
-  arrange(desc(n)) %>%
-  rename(NumberSurveys=n)
-
-#join survey count to site select
-site_select <- left_join(site_select, sampling_dates, by="Location")
-
-site_select <- site_select %>%
-  mutate(survey_event = paste(Date, Site,sep=" "))
-```
-
-# Debris types
-CSIRO debris classification system was modified to assign a material type and whether they are fishing or non-fishing related for each debris item.  Dispersiveness was added as a trait using Tangaroa Blue classification system.
-```{r load-item-code}
-#load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", 
-                      header=T, sep=",",
-                       fileEncoding="UTF-8-BOM") #removes special characters
-
-#filter out material as some item types may have more than one material type 
-#(ex. fishing items, furniture)
-item_code <- item_code %>%
-  dplyr::select(ID, item_name, Material, Dispersiveness, Fishing, Label) 
-
-site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
-
-site_select <- site_select %>%
-  mutate(item = paste(Material, item_name, sep=": "))
-```
-
-# Site attributes
-Each location included a 25m transect at a pier and an adjacent 25m soft sediment site in an area of boat traffic.  Distance from harbour mouth was calculated using ArcGIS Cost Distance analysis.
-```{r load-site-attributes}
-#load site coords and distance from harbour mouth
-site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
-
-#add distance to harbour mouth to site_select data
-site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
-  mutate(DistKm = CostDis/100) #distance to harbour mouth
+  #read in processed survey data
+  data <- read.csv(file="data/all_data.csv", 
+                   header=T, sep=",", 
+                   fileEncoding="UTF-8-BOM") #removes special characters
   
-#join distance to mouth to main dataset
-site_select <- left_join(site_select, site_attr, by="Site") 
+  data$Date <- dmy(data$Date) 
+  data$Notes <- as.character(data$Notes)
+  
+  #keep only unsw surveys and sites with public piers and >2 survey rounds
+  site_select <- data %>%
+    filter(Team=="UNSW" & 
+             Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
+    dplyr::select(-Habitat2, -Fragment, -Whole)
+  
+  #create a df for survey count per site
+  sampling_dates <- data %>%
+    group_by(Location) %>%
+    filter(Team=="UNSW") %>%
+    count(Date)
+  
+  #take away n
+  sampling_dates$n <- NULL
+  
+  #create a column for survey count per site
+  sampling_dates <- sampling_dates %>%
+    count(Location) %>%
+    arrange(desc(n)) %>%
+    rename(NumberSurveys=n)
+  
+  #join survey count to site select
+  site_select <- left_join(site_select, sampling_dates, by="Location")
+  
+  site_select <- site_select %>%
+    mutate(survey_event = paste(Date, Site,sep=" "))
+
+#Debris types
+  
+  #load item names
+  item_code <- read.csv(file="data/CSIRO-code.csv", 
+                        header=T, sep=",",
+                         fileEncoding="UTF-8-BOM") #removes special characters
+  
+  #filter out material as some item types may have more than one material type 
+  #(ex. fishing items, furniture)
+  item_code <- item_code %>%
+    dplyr::select(ID, item_name, Material, Dispersiveness, Fishing, Label) 
+  
+  site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
+  
+  site_select <- site_select %>%
+    mutate(item = paste(Material, item_name, sep=": "))
+
+#Site attributes
+  
+  #load site coords and distance from harbour mouth
+  site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
+  
+  #add distance to harbour mouth to site_select data
+  site_attr <- site_attr %>%
+    dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
+    mutate(DistKm = CostDis/100) #distance to harbour mouth
+    
+  #join distance to mouth to main dataset
+  site_select <- left_join(site_select, site_attr, by="Site") 
 ```
 
 ```{r high-level}
@@ -377,7 +375,7 @@ drop1(m_temp, test="Chisq")
 ```{r drop-levels-material}
 options(scipen = 999)
 
-site_select$Material[site_select$Material %in% var_change] = "Other" 
+site_select$Material[site_select$Material %in% var_change] = "Glass" 
 
 top_mat <- site_select %>%
   group_by(Material) %>%
@@ -471,6 +469,8 @@ write.csv(drop1_items,"drop1_items.csv", row.names = T)
                data = temp_df)
  
 drop1(m_temp, test="Chisq")
+
+summary(m_temp)
 
 ```
 
@@ -1056,14 +1056,20 @@ Here we see that nothing is interacting significantly with distance to harbour m
   TR$Dispersiveness <- as.factor(TR$Dispersiveness) #convert character to factor with 4 levels
   TR$Fishing <- as.factor(TR$Fishing) #convert character to factor with 2 levels
   TR$Material <- as.factor(TR$Material) #convert character to factor with 4 levels
+  
+  #alphabatising variables to force intercepts
+  TR$Material <- recode_factor(TR$Material, Other = "AOther")
+  TR$Fishing <- recode_factor(TR$Fishing, 'Non-fishing' = "ANon-fishing")
+  TR$Dispersiveness <- recode_factor(TR$Dispersiveness, 'Limited dispersion' = "ALimited dispersion")
 
 y <- as.matrix(abund)
 X <- scale(as.matrix(env))
 TR <- TR
 
 fit4th <- gllvm(y, X, TR, family="negative.binomial",
-                formula= y~(Pier + DistKm) +
+                formula = y ~ (Pier + DistKm) +
                   (Pier + DistKm) : (Dispersiveness + Fishing + Material))
+
 
 coefplot(fit4th, cex.ylab = .30)
 
@@ -1082,7 +1088,6 @@ plot.4th <- levelplot((as.matrix(fourth)),
 
 
 plot.4th
-coef
 
 summary(fourth)
 
