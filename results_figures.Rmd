@@ -99,8 +99,10 @@ library(vegan)
     dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
     mutate(DistKm = CostDis/100) #distance to harbour mouth
     
-  #join distance to mouth to main dataset
-  site_select <- left_join(site_select, site_attr, by="Site") 
+  #hab labels
+  
+  site_select$Habitat <- factor(site_select$Habitat, levels = c("P", "SS"),
+                  labels = c("Pier", "Sediment"))
 ```
 
 ```{r high-level}
@@ -236,302 +238,453 @@ citation("stats")
 
 drop1(m_hab, test="Chisq") #interaction p=0.005621 **
 ```
-## drop1 tables
-```{r drop-levels-item}
+```{r glmm-items}
 options(scipen = 999)
 
-top5 <- site_select %>%
-  group_by(Label) %>%
-  summarise(sum=sum(Total)) %>%
-  arrange(desc(sum)) %>%
-  top_n(5, sum)
-
-#create vector from top 5 items
-top5 <- top5$Label
-top5 <- unlist(top5)
-
-#All top + items of interest
-top_txt <- site_select %>%
-  filter(Label %in% top5) %>%
-  mutate(Label = as.factor(Label)) %>%
-  distinct(Label)%>%
-  pull(Label) %>% 
-  droplevels()
-
-drop1_interaction = purrr::map_df(top_txt, function(x){
-  
-  temp_df <- site_select %>%
-  filter(Label == paste0(x)) %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Label = x)
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-d <- drop1(m_temp, test="Chisq")
-d$Label = x
-return(d)
- })
-
-drop1_interaction <- drop1_interaction %>%
-  filter(LRT != "NA") %>%
-  rename(p.value = 'Pr(>Chi)')
-
-drop1_main = purrr::map_df(top_txt, function(x){
-  
-  temp_df <- site_select %>%
-  filter(Label == paste0(x)) %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Label = x)
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat + DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-d <- drop1(m_temp, test="Chisq")
-d$Label = x
-return(d)
- })
-
-drop1_main <- drop1_main %>%
-  filter(LRT != "NA") %>%
-  rename(p.value = 'Pr(>Chi)')
-
-drop1_items <- rbind(drop1_interaction, drop1_main)
-write.csv(drop1_items,"drop1_items.csv", row.names = T)
+# fishing line
+      mod_line <- site_select %>%
+        filter(Label=="Fishing line") %>% #fishing line
+        group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                    mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+    #GLMM model and predictions
+      m_line  <- glmmTMB(Total ~ #Debris count
+                       Habitat + DistKm + #predicted by distance from harbour mouth
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_line) 
+      
+      nd_line <- expand.grid(Habitat = unique(mod_line$Habitat),
+                        DistKm = seq(from = min(mod_line$DistKm),
+                                     to = max(mod_line$DistKm),
+                                     length=1000),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_line <- predict(object = m_line,
+                               newdata = nd_line,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_line$Total <- pred_line$fit
+      nd_line$SE_upper <- pred_line$fit + pred_line$se.fit
+      nd_line$SE_lower <- pred_line$fit - pred_line$se.fit
+      
+    #plot the predicted means
+      p_line <- ggplot(nd_line, aes(y=Total, x=DistKm)) + 
+        geom_line(aes(col=Habitat)) +
+        labs(title="Debris abundance predictions",
+                    subtitle="By habitat and distance from harbour mouth",
+             x="Distance from harbour mouth (km)", y="Total fishing line", tag="") +
+        geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+      
+      p_line
+      
+# Glass bottle
+      mod_glbtl <- site_select %>%
+        filter(Label=="Glass beverage bottle") %>% #glbtl
+        group_by(Date, Location, Habitat) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                    mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+  #GLMM model and predictions
+      m_glbtl  <- glmmTMB(Total ~ #Debris count
+                       Habitat + #predicted by distance from harbour mouth
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_glbtl) 
+      
+      nd_glbtl <- expand.grid(Habitat = unique(mod_glbtl$Habitat),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_glbtl <- predict(object = m_glbtl,
+                               newdata = nd_glbtl,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_glbtl$Total <- pred_glbtl$fit
+      nd_glbtl$SE_upper <- pred_glbtl$fit + pred_glbtl$se.fit
+      nd_glbtl$SE_lower <- pred_glbtl$fit - pred_glbtl$se.fit
+      
+  #plot the predicted means
+      p_glbtl <- ggplot(nd_glbtl, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(
+          # title="Debris abundance predictions",
+          #           subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total glass bottles", tag="") +
+        geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) 
+      
+      p_glbtl
+      
+# Metal scraps
+      mod_metsc <- site_select %>%
+        filter(Label=="Metal scraps") %>% #metal scraps
+        group_by(Date, Location, Habitat) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                    mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+  #GLMM model and predictions
+      m_metsc  <- glmmTMB(Total ~ #Debris count
+                       Habitat + #predicted by distance from harbour mouth
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_metsc) 
+      
+      nd_metsc <- expand.grid(Habitat = unique(mod_metsc$Habitat),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_metsc <- predict(object = m_metsc,
+                               newdata = nd_metsc,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_metsc$Total <- pred_metsc$fit
+      nd_metsc$SE_upper <- pred_metsc$fit + pred_metsc$se.fit
+      nd_metsc$SE_lower <- pred_metsc$fit - pred_metsc$se.fit
+      
+  #plot the predicted means
+      p_metsc <- ggplot(nd_metsc, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(
+          # title="Debris abundance predictions",
+          #           subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total metal scraps", tag="") +
+        geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) 
+      
+      p_metsc
+      
+# Fishhooks/sinkers
+      mod_hook <- site_select %>%
+        filter(Label=="Fishhook/sinker") %>% # fishhooks/sinkers
+        group_by(Date, Location, Habitat) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                    mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+  #GLMM model and predictions
+      m_hook  <- glmmTMB(Total ~ #Debris count
+                       Habitat + #predicted by distance from harbour mouth
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_hook) 
+      
+      nd_hook <- expand.grid(Habitat = unique(mod_hook$Habitat),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_hook <- predict(object = m_hook,
+                               newdata = nd_hook,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_hook$Total <- pred_hook$fit
+      nd_hook$SE_upper <- pred_hook$fit + pred_hook$se.fit
+      nd_hook$SE_lower <- pred_hook$fit - pred_hook$se.fit
+      
+  #plot the predicted means
+      p_hook <- ggplot(nd_hook, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(
+          # title="Debris abundance predictions",
+          #           subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total hooks & sinkers", tag="") +
+        geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) 
+      
+      p_hook
+      
+# Fishing misc.
+      mod_fmisc <- site_select %>%
+        filter(Label=="Fishing misc.") %>% # fishfmiscs/sinkers
+        group_by(Date, Location, Habitat) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                    mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+  #GLMM model and predictions
+      m_fmisc  <- glmmTMB(Total ~ #Debris count
+                       Habitat + #predicted by distance from harbour mouth
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_fmisc) 
+      
+      nd_fmisc <- expand.grid(Habitat = unique(mod_fmisc$Habitat),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_fmisc <- predict(object = m_fmisc,
+                               newdata = nd_fmisc,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_fmisc$Total <- pred_fmisc$fit
+      nd_fmisc$SE_upper <- pred_fmisc$fit + pred_fmisc$se.fit
+      nd_fmisc$SE_lower <- pred_fmisc$fit - pred_fmisc$se.fit
+      
+  #plot the predicted means
+      p_fmisc <- ggplot(nd_fmisc, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(
+          # title="Debris abundance predictions",
+          #           subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total fmiscs & sinkers", tag="") +
+        geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) 
+      
+      p_fmisc
 ```
 
 
-```{r drop-levels-fish}
-options(scipen = 999)
+```{r glmm-material}
 
- temp_df <- site_select %>%
-  filter(Fishing == "Fishing") %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-drop1(m_temp, test="Chisq") #Fishing: Habitat:DistKm  1 257.93 6.6198  0.01008 *
+# Metal predictions
+      #create df of all metal
+      mod_met <- site_select %>%
+        filter(Material=="Metal") %>% #glass
+        group_by(Date, Location, Habitat) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+        mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+      
+      m_met  <- glmmTMB(Total ~ #Debris count
+                       Habitat + #predicted by Habitat
+                       (1|Location) + (1|Date), #site/date random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_met)
 
-temp_df <- site_select %>%
-  filter(Fishing == "Non-Fishing") %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-drop1(m_temp, test="Chisq")
-
-temp_df <- site_select %>%
-  filter(Fishing == "Non-Fishing") %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat + DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-drop1(m_temp, test="Chisq")
+      nd_met <- expand.grid(Habitat = unique(mod_met$Habitat),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_met <- predict(object = m_met,
+                               newdata = nd_met,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_met$Total <- pred_met$fit
+      nd_met$SE_upper <- pred_met$fit + pred_met$se.fit
+      nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
+      
+  #plot the predicted means
+      p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(
+          # title="Debris abundance predictions",
+          #           subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total metal items", tag="") +
+        geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) 
+      
+      p_met
+      
+#Plastic predictions
+      
+      mod_plas <- site_select %>%
+      filter(Material=="Plastic") %>% #glass
+      group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+      summarise(Total=sum(Total)) %>%
+      ungroup() %>%
+      mutate(Location = as.factor(Location),
+             Habitat = as.factor(Habitat))
+    
+    
+      m_plas  <- glmmTMB(Total ~ #Debris count
+                     Habitat*DistKm + #predicted by Habitat
+                     (1|Location) + (1|Date), #site/date random effect
+                   family=nbinom1(), #negative binomial to deal with count data and zeros
+                   data = mod_plas)
+      
+      nd_plas <- expand.grid(Habitat = unique(mod_plas$Habitat),
+                        DistKm = seq(from = min(mod_plas$DistKm),
+                                     to = max(mod_plas$DistKm),
+                                     length=1000),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_plas <- predict(object = m_plas,
+                               newdata = nd_plas,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_plas$Total <- pred_plas$fit
+      nd_plas$SE_upper <- pred_plas$fit + pred_plas$se.fit
+      nd_plas$SE_lower <- pred_plas$fit - pred_plas$se.fit
+      
+    #plot the predicted means
+      p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) + 
+        geom_line(aes(col=Habitat)) +
+        labs(title="Debris abundance predictions",
+                    subtitle="By habitat and distance from harbour mouth",
+             x="Distance from harbour mouth (km)", y="Total plastic items", tag="") +
+        geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+      
+      p_plas
+      
+#Glass predictions
+            
+      #create df of all glass
+      mod_gls <- site_select %>%
+        filter(Material=="Glass") %>% #glass
+        group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+        mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+      
+      m_gls  <- glmmTMB(Total ~ #Debris count
+                       Habitat*DistKm + #predicted by Habitat
+                       (1|Location) + (1|Date), #site/date random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_gls)
+      
+      nd_gls <- expand.grid(Habitat = unique(mod_gls$Habitat),
+                        DistKm = seq(from = min(mod_gls$DistKm),
+                                     to = max(mod_gls$DistKm),
+                                     length=1000),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_gls <- predict(object = m_gls,
+                               newdata = nd_gls,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+                          
+      
+      nd_gls$Total <- pred_gls$fit
+      nd_gls$SE_upper <- pred_gls$fit + pred_gls$se.fit
+      nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
+      
+    #plot the predicted means
+      p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) + 
+        geom_line(aes(col=Habitat)) +
+        labs(title="Debris abundance predictions",
+                    subtitle="By habitat and distance from harbour mouth",
+             x="Distance from harbour mouth (km)", y="Total glass items", tag="") +
+        geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+      
+      p_gls
 ```
+```{r glmm-fish, warning=FALSE, message=FALSE}
 
-```{r drop-levels-material}
-options(scipen = 999)
-
-site_select$Material[site_select$Material %in% var_change] = "Glass" 
-
-top_mat <- site_select %>%
-  group_by(Material) %>%
-  summarise(sum=sum(Total)) %>%
-  arrange(desc(sum)) %>%
-  top_n(8, sum)
-
-#create vector from top 5 items
-top_mat <- top_mat$Material
-top_mat <- unlist(top_mat)
-
-#All top + items of interest
-txt <- site_select %>%
-  mutate(Material = as.factor(Material)) %>%
-  distinct(Material)%>%
-  pull(Material) %>% 
-  droplevels()
-
-drop1_interaction = purrr::map_df(txt, function(x){
-  
-  temp_df <- site_select %>%
-  filter(Material == paste0(x)) %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Material = x)
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-d <- drop1(m_temp, test="Chisq")
-d$Material = x
-return(d)
- })
-
-drop1_interaction <- drop1_interaction %>%
-  filter(LRT != "NA") %>%
-  rename(p.value = 'Pr(>Chi)')
-
-drop1_main = purrr::map_df(txt, function(x){
-  
-  temp_df <- site_select %>%
-  filter(Material == paste0(x)) %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat),
-         Material = x)
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat + DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-d <- drop1(m_temp, test="Chisq")
-d$Material = x
-return(d)
- })
-
-drop1_main <- drop1_main %>%
-  filter(LRT != "NA") %>%
-  rename(p.value = 'Pr(>Chi)')
-
-drop1_items <- rbind(drop1_interaction, drop1_main)
-write.csv(drop1_items,"drop1_items.csv", row.names = T)
+# Fishing items
+      #create df to use for models
+      mod_fish <- site_select %>%
+        filter(Fishing=="Fishing") %>% #fishing line
+        group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+      #GLM negative binomial with two variables and zero inflation
+      m_fish  <- glmmTMB(Total ~ #Debris count
+                       Habitat * DistKm + #predicted by distance from harbour mouth
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_fish) 
+      
+      # Predictors for fishing related debris are: Habitat + DistKm
+      
+      nd_fish <- expand.grid(Habitat = unique(mod_fish$Habitat),
+                        DistKm = seq(from = min(mod_fish$DistKm),
+                                     to = max(mod_fish$DistKm),
+                                     length=1000),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_fish <- predict(object = m_fish,
+                               newdata = nd_fish,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+      
+      nd_fish$Total <- pred_fish$fit
+      nd_fish$SE_upper <- pred_fish$fit + pred_fish$se.fit
+      nd_fish$SE_lower <- pred_fish$fit - pred_fish$se.fit
+      
+      p_fish <- ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
+        geom_line(aes(col=Habitat)) +
+        geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+        # theme(legend.position = "none",
+        #       panel.grid = element_blank(),
+        #       axis.title = element_blank(),
+        #       axis.text = element_blank(),
+        #       panel.background = element_blank()) 
+      
+      p_fish
+      
+      # svg("images/p_fish.svg")
+      # plot(p_fish, height=7, width=7, units="in")
+      # dev.off()
 
 
-  
-  temp_df <- site_select %>%
-  filter(Material == "Glass") %>%
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-  mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
- 
- #create model
-  m_temp  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = temp_df)
- 
-drop1(m_temp, test="Chisq")
+# Nonfishing items
 
-summary(m_temp)
-
-```
-
-## glm fish
-```{r glm-fish, warning=FALSE, message=FALSE}
-#create df to use for models
-mod_fish <- site_select %>%
-  filter(Fishing=="Fishing") %>% #fishing line
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-m_fish  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by distance from harbour mouth
-                   # Coast + #predicted by north or south coast
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_fish) 
-
-# Predictors for fishing related debris are: Habitat + DistKm
-
-nd_fish <- expand.grid(Habitat = unique(mod_fish$Habitat),
-                  DistKm = seq(from = min(mod_fish$DistKm),
-                               to = max(mod_fish$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-pred_fish <- predict(object = m_fish,
-                         newdata = nd_fish,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_fish$Total <- pred_fish$fit
-nd_fish$SE_upper <- pred_fish$fit + pred_fish$se.fit
-nd_fish$SE_lower <- pred_fish$fit - pred_fish$se.fit
-
-p_fish <- ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
-  geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-  theme(legend.position = "none",
-        panel.grid = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        panel.background = element_blank()) 
-
-p_fish
-
-# ggsave(filename = "images/p_fish.svg", plot = p_fish, device="svg", height=7, width=7, units="in")
-
-svg("images/p_fish.svg")
-plot(p_fish, height=7, width=7, units="in")
-dev.off()
-
-   # labs(title="Debris abundance predictions: Fishing related",
-    #    subtitle="By habitat and distance from harbour mouth",
-       # x="Distance from harbour mouth (km)", y="Total debris items", tag="") 
+      mod_nonfish <- site_select %>%
+        filter(Fishing=="Non-Fishing") %>% #nonfishing debris
+        group_by(Date, Location, Habitat) %>% #relevant variables
+        summarise(Total=sum(Total)) %>%
+        ungroup() %>%
+                    mutate(Location = as.factor(Location),
+               Habitat = as.factor(Habitat))
+      
+      m_nonfish  <- glmmTMB(Total ~ #Debris count
+                       Habitat + #predicted by Habitat
+                       (1|Location) + (1|Date), #site random effect
+                     family=nbinom1(), #negative binomial to deal with count data and zeros
+                     data = mod_nonfish)
+      
+      nd_nonfish <- expand.grid(Habitat = unique(mod_nonfish$Habitat),
+                        Location = NA,
+                        Date = NA)
+      
+      pred_nonfish <- predict(object = m_nonfish,
+                               newdata = nd_nonfish,
+                               se.fit = T,
+                               re.form = NA,
+                               type="response")
+      
+      nd_nonfish$Total <- pred_nonfish$fit
+      nd_nonfish$SE_upper <- pred_nonfish$fit + pred_nonfish$se.fit
+      nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
+      
+      #plot the predicted means
+            p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
+            geom_col(aes(fill=Habitat)) +
+            labs(
+                # title="Debris abundance predictions",
+                #           subtitle="By habitat and distance from harbour mouth",
+                   x="Habitat", y="Total nonfishal items", tag="") +
+            geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) 
+            
+            p_nonfish
 
 ```
 ## Testing non-fishing related debris

@@ -1,16 +1,13 @@
 ---
 title: "stats-tests"
 author: "Brie Sherow"
-date: "11/11/2020"
-output:
-  html_document:
-    toc: yes
-    toc_float: yes
-    code_folding: hide
-    df_print: paged
-  pdf_document:
-    toc: yes
+date: "17/09/2021"
+output: html_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -24,7 +21,7 @@ library(lubridate) #date manipulation
 library(forcats) #working with factors
 library(tidyverse) #manipulating data
 library(knitr) #rmarkdown functions
-# library(kableExtra) #table layouts
+#library(kableExtra) #table layouts
 library(magick) #image processing
 library(stats) #R stats functions
 library(broom) #create summaries from stats objects
@@ -33,119 +30,417 @@ library(MASS) #stats
 library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
-# library(lattice) #fourth corner heatmap
-# library(corrplot) #co-occurrence matrix
-library(gclus) #co-occurrence matrix
-library(broom.mixed) #regression tables
-library(vegan) #ordination
-library(sjPlot) #regression models as HTML table
-library(sjmisc) #regression models as HTML table
-library(sjlabelled) #regression models as HTML table
-
-#Tutorial
-#https://cran.r-project.org/web/packages/gllvm/vignettes/vignette1.html
+library(emmeans) #pairwise comparisons
 ```
-# Supplementary Materials 
-The repository used to store this data can be found at [https://github.com/brieaspasia/marine-debris](https://github.com/brieaspasia/marine-debris)
 
 # Site selection
 10 sites at 5 locations were surveyed between 3-5 times each during summer 2019-2020.
 ```{r create-site-select}
-#read in processed survey data
-data <- read.csv(file="data/all_data.csv", 
-                 header=T, sep=",", 
-                 fileEncoding="UTF-8-BOM") #removes special characters
+#Site selection
 
-data$Date <- dmy(data$Date) 
-data$Notes <- as.character(data$Notes)
-
-#keep only unsw surveys and sites with public piers and >2 survey rounds
-site_select <- data %>%
-  filter(Team=="UNSW" & 
-           Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
-  dplyr::select(-Habitat2, -Fragment, -Whole)
-
-#create a df for survey count per site
-sampling_dates <- data %>%
-  group_by(Location) %>%
-  filter(Team=="UNSW") %>%
-  count(Date)
-
-#take away n
-sampling_dates$n <- NULL
-
-#create a column for survey count per site
-sampling_dates <- sampling_dates %>%
-  count(Location) %>%
-  arrange(desc(n)) %>%
-  rename(NumberSurveys=n)
-
-#join survey count to site select
-site_select <- left_join(site_select, sampling_dates, by="Location")
-
-site_select <- site_select %>%
-  mutate(survey_event = paste(Date, Site,sep=" "))
-
-HabitatLabs <- c(P = "Pier", SS = "Sediment")
-```
-
-# Debris Types
-CSIRO debris classification system was modified to assign a material type and whether fishing or non-fishing related for each debris item.  Dispersiveness was added as a trait using Tangaroa Blue classification system.
-```{r load-item-code}
-#load item names
-item_code <- read.csv(file="data/CSIRO-code.csv", 
-                      header=T, sep=",",
-                      fileEncoding="UTF-8-BOM") #removes special characters) 
-
-# #filter out material as some item types may have more than one material type 
-# #(ex. fishing items, furniture)
-# item_code <- item_code %>%
-#   dplyr::select(ID, item_name, Fishing, Dispersiveness) 
-
-site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code")) 
-
-#state variables to rename (strict)
-var_change <- c("Ceramic", "Undetermined", "E-Waste", "Paper", "Construction", "Organic", "Unknown", "Timber", "Foam", "Brick or Cement", "Rubber", "Cloth", "")
-
-# #state variables to rename (loose)
-# var_change <- c("Ceramic", "Undetermined", "Paper", "Construction", "Organic", "Unknown", "Foam", "") 
-
-#change Material to character
-site_select$Material <- as.character(site_select$Material) 
-
-#set lesser used categories to 'Other'
-site_select$Material[site_select$Material %in% var_change] = "Other" 
-
-```
-
-# Site Attributes
-Each location included a 25m transect at a pier and an adjacent 25m soft sediment site in an area of boat traffic.  Distance from harbour mouth was calculated using ArcGIS Cost Distance analysis.
-```{r load-site-attributes}
-#load site coords and distance from harbour mouth
-site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
-
-#add distance to harbour mouth to site_select data
-site_attr <- site_attr %>%
-  dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
-  mutate(DistKm = CostDis/100) #distance to harbour mouth
+  #read in processed survey data
+  data <- read.csv(file="data/all_data.csv", 
+                   header=T, sep=",", 
+                   fileEncoding="UTF-8-BOM") #removes special characters
   
-#join distance to mouth to main dataset
-site_select <- left_join(site_select, site_attr, by="Site") 
-
-site_select$Habitat[site_select$Habitat == "P"] <-"Pier"
-site_select$Habitat[site_select$Habitat == "SS"] <-"Sediment"
+  data$Date <- dmy(data$Date) 
+  data$Notes <- as.character(data$Notes)
   
+  #keep only unsw surveys and sites with public piers and >2 survey rounds
+  site_select <- data %>%
+    filter(Team=="UNSW" & 
+             Location %in% c("DOUBL","WATSO","PARSL","NEUTR","CLIFT")) %>%
+    dplyr::select(-Habitat2, -Fragment, -Whole)
+  
+  #create a df for survey count per site
+  sampling_dates <- data %>%
+    group_by(Location) %>%
+    filter(Team=="UNSW") %>%
+    count(Date)
+  
+  #take away n
+  sampling_dates$n <- NULL
+  
+  #create a column for survey count per site
+  sampling_dates <- sampling_dates %>%
+    count(Location) %>%
+    arrange(desc(n)) %>%
+    rename(NumberSurveys=n)
+  
+  #join survey count to site select
+  site_select <- left_join(site_select, sampling_dates, by="Location")
+  
+  site_select <- site_select %>%
+    mutate(survey_event = paste(Date, Site,sep=" "))
+
+#Debris types
+  
+  #load item names
+  item_code <- read.csv(file="data/CSIRO-code.csv", 
+                        header=T, sep=",",
+                         fileEncoding="UTF-8-BOM") #removes special characters
+  
+  #filter out material as some item types may have more than one material type 
+  #(ex. fishing items, furniture)
+  item_code <- item_code %>%
+    dplyr::select(ID, item_name, Material, Dispersiveness, Fishing, Label) 
+  
+  site_select <- left_join(site_select, item_code, by="ID", suffix=c("", ".code"))
+  
+  site_select <- site_select %>%
+    mutate(item = paste(Material, item_name, sep=": "))
+
+#Site attributes
+  
+  #load site coords and distance from harbour mouth
+  site_attr <- read.csv(file="data/site_attributes.csv", header=T, sep=",", fileEncoding="UTF-8-BOM")
+  
+  #add distance to harbour mouth to site_select data
+  site_attr <- site_attr %>%
+    dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
+    mutate(DistKm = CostDis/100) #distance to harbour mouth
+    
+  #join distance to mouth to main dataset
+  site_select <- left_join(site_select, site_attr, by="Site") 
 ```
 
-# GLMM model
-Regression isolates the relationship between each independent variable (Habitat and distance) and the dependent variable (Total debris). Total debris count predicted by habitat (pier or sediment) and coast (north or south), with date nested in location as a random effect.  Using negative binomial because it is count data with a high number of zeros.
+## items
 
-Debris type is not considered as a random effect because in this instance it is the total debris count that matters rather than the individual debris types.  Accumulation due to repeat surveys is also not considered as the temporal autocorrelation does not indicate that repeat surveys are significant (see below).
+```{r drop-levels-item}
+options(scipen = 999)
 
-# Q1: How does habitat impact debris amount?
-```{r glm-hab, warning=FALSE, message=FALSE}
+top5 <- site_select %>%
+  group_by(Label) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(5, sum)
+
+#create vector from top 5 items
+top5 <- top5$Label
+top5 <- unlist(top5)
+
+#All top + items of interest
+top_txt <- site_select %>%
+  filter(Label %in% top5) %>%
+  mutate(Label = as.factor(Label)) %>%
+  distinct(Label)%>%
+  pull(Label) %>% 
+  droplevels()
+
+drop1_interaction = purrr::map_df(top_txt, function(x){
+  
+  temp_df <- site_select %>%
+  filter(Label == paste0(x)) %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Label = x)
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+d <- drop1(m_temp, test="Chisq")
+d$Label = x
+return(d)
+ })
+
+drop1_interaction <- drop1_interaction %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)')
+
+drop1_main = purrr::map_df(top_txt, function(x){
+  
+  temp_df <- site_select %>%
+  filter(Label == paste0(x)) %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat),
+         Label = x)
+ 
+ #create model
+  m_temp  <- glmmTMB(Total ~ #Debris count
+                 Habitat + DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = temp_df)
+ 
+d <- drop1(m_temp, test="Chisq")
+d$Label = x
+return(d)
+ })
+
+drop1_main <- drop1_main %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)')
+
+drop1_items <- rbind(drop1_interaction, drop1_main)
+write.csv(drop1_items,"drop1_items.csv", row.names = T)
+```
+
+```{r model-verification-line}
+
 #create df to use for models
-mod_hab <- site_select %>%
+mod_line <- site_select %>%
+  filter(Label=="Fishing line") %>% #fishing line
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#GLM negative binomial with two variables
+m_line  <- glmmTMB(Total ~ #Debris count
+                 Habitat + DistKm + #predicted by distance from harbour mouth
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_line) 
+
+so_line <- simulateResiduals(fittedModel = m_line, plot=T)
+  
+plotResiduals(so_line)
+
+testUniformity(so_line) #tests if the overall distribution conforms to expectations
+testOutliers(so_line) #tests if there are more simulation outliers than expected
+testDispersion(so_line) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_line) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_line) #tests if there are more zeros than expected
+```
+
+```{r model-verification-glbtl}
+
+#create df to use for models
+mod_glbtl <- site_select %>%
+  filter(Label=="Glass beverage bottle") %>% #fishing glbtl
+  group_by(Date, Location, Habitat) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#GLM negative binomial with two variables
+m_glbtl  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by distance from harbour mouth
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_glbtl) 
+
+so_glbtl <- simulateResiduals(fittedModel = m_glbtl, plot=T)
+  
+plotResiduals(so_glbtl)
+
+testUniformity(so_glbtl) #tests if the overall distribution conforms to expectations
+testOutliers(so_glbtl) #tests if there are more simulation outliers than expected
+testDispersion(so_glbtl) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_glbtl) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_glbtl) #tests if there are more zeros than expected
+```
+
+```{r model-verification-metsc}
+
+#create df to use for models
+mod_metsc <- site_select %>%
+  filter(Label=="Metal scraps") %>% # metsc
+  group_by(Date, Location, Habitat) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#GLM negative binomial with two variables
+m_metsc  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by distance from harbour mouth
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_metsc) 
+
+so_metsc <- simulateResiduals(fittedModel = m_metsc, plot=T)
+  
+plotResiduals(so_metsc)
+
+testUniformity(so_metsc) #tests if the overall distribution conforms to expectations
+testOutliers(so_metsc) #tests if there are more simulation outliers than expected
+testDispersion(so_metsc) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_metsc) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_metsc) #tests if there are more zeros than expected
+```
+
+```{r model-verification-hooks}
+
+#create df to use for models
+mod_hook <- site_select %>%
+  filter(Label=="Fishhook/sinker") %>% # hook
+  group_by(Date, Location, Habitat) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#GLM negative binomial with two variables
+m_hook  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by distance from harbour mouth
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_hook) 
+
+so_hook <- simulateResiduals(fittedModel = m_hook, plot=T)
+  
+plotResiduals(so_hook)
+
+testUniformity(so_hook) #tests if the overall distribution conforms to expectations
+testOutliers(so_hook) #tests if there are more simulation outliers than expected
+testDispersion(so_hook) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_hook) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_hook) #tests if there are more zeros than expected
+```
+```{r model-verification-misc-fish}
+
+#create df to use for models
+mod_fmisc <- site_select %>%
+  filter(Label=="Fishing misc.") %>% # fmisc
+  group_by(Date, Location, Habitat) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#GLM negative binomial with two variables
+m_fmisc  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by distance from harbour mouth
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_fmisc) 
+
+so_fmisc <- simulateResiduals(fittedModel = m_fmisc, plot=T)
+  
+plotResiduals(so_fmisc)
+
+testUniformity(so_fmisc) #tests if the overall distribution conforms to expectations
+testOutliers(so_fmisc) #tests if there are more simulation outliers than expected
+testDispersion(so_fmisc) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_fmisc) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_fmisc) #tests if there are more zeros than expected
+```
+## material type
+
+```{r drop-levels-material}
+options(scipen = 999)
+
+# Plastics interaction  (significant)
+  plas_df <- site_select %>%
+  filter(Material == "Plastic") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_plas  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = plas_df)
+ 
+drop1_plas_int <- drop1(m_plas, test="Chisq")
+
+drop1_plas_int<- drop1_plas_int %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)') %>%
+  mutate(Model = "Interaction",
+         Material = "Plastic")
+
+# Metals interaction  (not significant)
+  met_df <- site_select %>%
+  filter(Material == "Metal") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_met  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = met_df)
+ 
+drop1_met_int <- drop1(m_met, test="Chisq")
+
+drop1_met_int<- drop1_met_int %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)') %>%
+  mutate(Model = "Interaction",
+         Material = "Metal")
+
+# Metals main (Habitat significant)
+  met_df <- site_select %>%
+  filter(Material == "Metal") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_met  <- glmmTMB(Total ~ #Debris count
+                 Habitat + DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = met_df)
+ 
+drop1_met_main <- drop1(m_met, test="Chisq")
+
+drop1_met_main<- drop1_met_main %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)') %>%
+  mutate(Model = "Main",
+         Material = "Metal")
+
+control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS"))
+
+# Glass interaction (significant)
+  gls_df <- site_select %>%
+  filter(Material == "Glass") %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_gls  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom2(), #negative binomial to deal with count data and zeros
+               data = gls_df)
+ 
+drop1_gls_int <- drop1(m_gls, test="Chisq")
+
+drop1_gls_int<- drop1_gls_int %>%
+  filter(LRT != "NA") %>%
+  rename(p.value = 'Pr(>Chi)') %>%
+  mutate(Model = "Interaction",
+         Material = "Glass")
+
+drop1_mat <- rbind(drop1_gls_int, drop1_met_main, drop1_met_int, drop1_plas_int)
+write.csv(drop1_mat,"drop1_mat.csv", row.names = T)
+
+```
+
+
+```{r model-verification-mat-glass}
+#create df of all glass
+mod_gls <- site_select %>%
+  filter(Material=="Glass") %>% #glass
   group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
   summarise(Total=sum(Total)) %>%
   ungroup() %>%
@@ -153,871 +448,32 @@ mod_hab <- site_select %>%
          Habitat = as.factor(Habitat))
 
 
-m_hab  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_hab)
-
-# m_hab2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location) + (1|Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# m_hab3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hab)
-# 
-# AIC(m_hab, m_hab2, m_hab3) #AIC shows m_hab to be the best fit
-
-```
-# Summary - these concepts are important as comparisons between different model fits, but the numbers themselves aren't necessarily important.
-  ## AIC estimates out of sample prediction error and thereby relative quality of model
-  ## BIC (Bayesian information criterion) is a criterion for model selection among a finite set of models; the model with the lowest BIC is preferred.
-  ## logLik is a function of sample size, can be used to compare the fit of different coefficients.  Larger number is better.
-  ## Deviance is a measure of error.  lower deviance means better fit to data. The greater the deviance, the worse the model fits compared to the best case (saturated).
-  ## df.resid is the sample size minus the number of parameters being measured.
-```{r model-summary-hab}
-summary(m_hab)
-coef(m_hab)
-```
-# Glossary
-  ## QQ Plot - compares a sample with a theoretical sample that comes from a certain distribution (normal distribution)
-  ## Residuals - difference between the actual observed response values and the response values that the model predicted.
-  ## Estimate - same as residuals?  coefficients?
-  ## Standard Error - measure the amount that the coefficient estimates vary from the actual average value of the response variable. Ideally this will be a lower number relative to the coefficients. 
-  ## P-value - probability of obtaining results as extreme as the observed results of a statistical hypothesis test, assuming that the null hypothesis is correct and there is no relationship between the variables. <5% means that there is a relationship.
-
-```{r simulation-output-hab}
-simulationOutput_hab <- simulateResiduals(fittedModel = m_hab, plot=T)
-  
-plotResiduals(simulationOutput_hab)
-
-testUniformity(simulationOutput_hab) #tests if the overall distribution conforms to expectations
-# testOutliers(simulationOutput_hab) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_hab) #tests if the simulated dispersion is equal to the observed dispersion
-#testQuantiles(simulationOutput_hab) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_hab) #tests if there are more zeros than expected
-
-```
-
-# Plotting model predictions
-
-
-```{r hab-predict}
-
-#1 create a new dataframe with columns of all fixed predictor variables in the model, and rows of all possible values of those predictor variables that you want predictions for. For a line plot you want to predict lots of values so the lines are smooth, for a barplot just predict a single value for each bar.
-
-# Predictors are: Habitat + DistKm
-
-nd_hab <- expand.grid(Habitat = unique(mod_hab$Habitat),
-                  DistKm = seq(from = min(mod_hab$DistKm),
-                               to = max(mod_hab$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-#2. the predict function uses your model and the new dataframe from above to predict mean values of the response variable. It predicts a value for each row in the new dataframe. You should also be able to predict the standard error by setting se.fit to TRUE, though will need to assign the result to a different object or column in nd.
-
-pred_hab <- predict(object = m_hab,
-                         newdata = nd_hab,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-                    
-
-nd_hab$Total <- pred_hab$fit
-nd_hab$SE_upper <- pred_hab$fit + pred_hab$se.fit
-nd_hab$SE_lower <- pred_hab$fit - pred_hab$se.fit
-
-#plot the predicted means
-p_hab <- ggplot(nd_hab, aes(y=Total, x=DistKm)) + 
-  geom_line(aes(col=Habitat)) +
-  labs(title="Debris abundance predictions",
-       subtitle="By habitat and distance from harbour mouth",
-       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-  theme_minimal()
-
-p_hab
-
-ggsave(filename = "images/p_hab.svg", plot = p_hab, device="svg", height=7, width=12, units="in")
-
-```
-
-
-# Q2 Does fishing or non-fishing debris type impact distribution?
-## Testing fishing related debris
-```{r glm-fish, warning=FALSE, message=FALSE}
-#create df to use for models
-mod_fish <- site_select %>%
-  filter(Fishing=="Fishing") %>% #fishing line
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-m_fish  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by distance from harbour mouth
-                   # Coast + #predicted by north or south coast
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_fish) 
-
-# m_fish2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by distance from harbour mouth
-#                    # Coast + #predicted by north or south coast
-#                  (1|Location) + (1|Date), #site random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_fish) 
-# 
-# m_fish3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by distance from harbour mouth
-#                    # Coast + #predicted by north or south coast
-#                  (1|Location) + (1|Date), #site random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_fish) 
-# 
-# AIC(m_fish, m_fish2, m_fish3) #m_fish is the best fit
-
-```
-
-```{r model-summary-fish}
-summary(m_fish)
-coef(m_fish)
-```
-
-```{r simulation-output-fish}
-simulationOutput_fish <- simulateResiduals(fittedModel = m_fish, plot=T)
-  
-plotResiduals(simulationOutput_fish)
-
-testUniformity(simulationOutput_fish) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_fish) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_fish) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_fish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_fish) #tests if there are more zeros than expected
-```
-
-```{r fish-predict}
-
-# Predictors for fishing related debris are: Habitat + DistKm
-
-nd_fish <- expand.grid(Habitat = unique(mod_fish$Habitat),
-                  DistKm = seq(from = min(mod_fish$DistKm),
-                               to = max(mod_fish$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-pred_fish <- predict(object = m_fish,
-                         newdata = nd_fish,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_fish$Total <- pred_fish$fit
-nd_fish$SE_upper <- pred_fish$fit + pred_fish$se.fit
-nd_fish$SE_lower <- pred_fish$fit - pred_fish$se.fit
-
-p_fish <- ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
-  geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-    labs(title="Debris abundance predictions: Fishing related",
-       subtitle="By habitat and distance from harbour mouth",
-       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_fish
-
-ggsave(filename = "images/p_fish.svg", plot = p_fish, device="svg", height=7, width=7, units="in")
-```
-
-
-## Testing non-fishing related debris
-```{r glm-nonfish, warning=FALSE, message=FALSE}
-#create df to use for models
-mod_nonfish <- site_select %>%
-  filter(Fishing=="Non-Fishing") %>% #nonfishing debris
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-# GLM negative binomial with two variables and zero inflation
-m_nonfish  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_nonfish)
-
-library(emmeans)
-emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)))
-
-#pier diff 3.05 - 4.28 (-1.23) at 1, 2.94 - 4.06 (-1.12) at 8
-#sedi diff 1.22 - 3.14 (-1.92) at 1, 1.91 - 3.43 (-1.52) at 8
-
-m_nonfish  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_nonfish)
-
-# m_nonfish3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat 
-#                  (1|Location) + (1|Date), #site random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_nonfish) 
-
-# AIC(m_nonfish1, m_nonfish, m_nonfish3) #Habitat is the only significant in nonfishing debris
-```
-
-```{r model-summary-nonfish}
-summary(m_nonfish)
-coef(m_nonfish)
-```
-
-```{r simulation-output-nonfish}
-simulationOutput_nonfish <- simulateResiduals(fittedModel = m_nonfish, plot=T)
-  
-plotResiduals(simulationOutput_nonfish)
-
-testUniformity(simulationOutput_nonfish) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_nonfish) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_nonfish) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_nonfish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_nonfish) #tests if there are more zeros than expected
-```
-
-
-```{r nonfish-predict-setup}
-
-# Predictors for non-fishing related debris are: Habitat
-
-nd_nonfish <- expand.grid(Habitat = unique(mod_nonfish$Habitat),
-                          # DistKm = seq(from = min(mod_nonfish$DistKm),
-                          #      to = max(mod_nonfish$DistKm),
-                          #      length=1000),
-                  Location = NA,
-                  Date = NA)
-
-
-pred_nonfish <- predict(object = m_nonfish,
-                         newdata = nd_nonfish,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_nonfish$Total <- pred_nonfish$fit
-nd_nonfish$SE_upper <- pred_nonfish$fit + pred_nonfish$se.fit
-nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
-
-
-p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-   labs(title="Debris abundance predictions: Non-fishing related",
-       subtitle="By habitat",
-       x="Habitat", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_nonfish
-
-ggsave(filename = "images/p_nonfish.svg", plot = p_nonfish, device="svg", height=7, width=7, units="in")
-
-# p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) +
-#   geom_line(aes(col=Habitat)) +
-#   geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-#     labs(title="Debris abundance predictions: Non-fishing related",
-#        subtitle="By habitat",
-#        x="Habitat", y="Total debris items", tag="") +
-#   theme_minimal()
-```
-
-## Testing fishing line debris type
-
-```{r glm-F2, warning=FALSE, message=FALSE}
-#create df of fishing line to use for models
-mod_F2 <- site_select %>%
-  filter(ID=="F2") %>% #fishing line
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-m_F2  <- glmmTMB(Total ~ #Debris count
-                 Habitat * DistKm + #distance from harbour mouth
-                 (1|Location) + (1|Date), #site random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_F2) 
-
-# m_F22  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #distance from harbour mouth
-#                  (1|Location) + (1|Date), #site random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2) 
-# 
-# m_F23  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #distance from harbour mouth
-#                  (1|Location) + (1|Date), #site random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_F2) 
-# 
-# AIC(m_F2, m_F22, m_F23) #AIC shows m_F2 is best fit
-
-```
-
-```{r model-summary-F2}
-summary(m_F2)
-coef(m_F2)
-```
-
-```{r simulation-output-m_F2}
-#simulation output for fishing line counts
-simulationOutput_F2 <- simulateResiduals(fittedModel = m_F2, plot=T)
-  
-plotResiduals(simulationOutput_F2)
-
-testUniformity(simulationOutput_F2) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_F2) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_F2) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_F2) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_F2) #tests if there are more zeros than expected
-```
-```{r F2-predict}
-
-# Predictors are: Habitat, DistKm
-
-nd_F2 <- expand.grid(Habitat = unique(mod_F2$Habitat),
-                          DistKm = seq(from = min(mod_F2$DistKm),
-                               to = max(mod_F2$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-pred_F2 <- predict(object = m_F2,
-                         newdata = nd_F2,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_F2$Total <- pred_F2$fit
-nd_F2$SE_upper <- pred_F2$fit + pred_F2$se.fit
-nd_F2$SE_lower <- pred_F2$fit - pred_F2$se.fit
-
-#plot the predicted means
-
-p_F2 <- ggplot(nd_F2, aes(y=Total, x=DistKm)) +
-  geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
-    labs(title="Debris abundance predictions: Fishing line",
-       subtitle="By habitat and distance from harbour mouth",
-       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_F2
-
-ggsave(filename = "images/p_F2.svg", plot = p_F2, device="svg", height=7, width=7, units="in")
-```
-## Testing hooks/sinkers debris type
-```{r glm-hook, warning=FALSE, message=FALSE}
-#create df of fishing hooks/sinkers to use for models
-mod_hook <- site_select %>%
-  filter(ID=="F6") %>% #fishhooks and sinkers
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-# m_hook1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat * DistKm +
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook) 
-
-m_hook  <- glmmTMB(Total ~ #Debris count
-                 Habitat +
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_hook) 
-
-# m_hook3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm +
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook) 
-
-
-# AIC(m_hook1, m_hook2, m_hook3) #just use habitat as its the simpler model and less than 1 AIC difference than using DistKm too.
-
-```
-
-
-```{r model-summary-hook}
-summary(m_hook)
-coef(m_hook)
-```
-
-```{r simulation-output-m_hook}
-#simulation output for hook/sinker counts
-simulationOutput_hook <- simulateResiduals(fittedModel = m_hook, plot=T)
-  
-plotResiduals(simulationOutput_hook)
-
-testUniformity(simulationOutput_hook) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_hook) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_hook) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_hook) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_hook) #tests if there are more zeros than expected
-```
-```{r hook-predict}
-
-# Predictors are: Habitat, DistKm
-
-nd_hook <- expand.grid(Habitat = unique(mod_hook$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_hook <- predict(object = m_hook,
-                         newdata = nd_hook,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_hook$Total <- pred_hook$fit
-nd_hook$SE_upper <- pred_hook$fit + pred_hook$se.fit
-nd_hook$SE_lower <- pred_hook$fit - pred_hook$se.fit
-
-#plot the predicted means
-
-ggplot(nd_hook, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower, width=0.2), 
-  position=position_dodge(width=0.90))
-```
-## Testing glass bottles debris type
-```{r glm-btl, warning=FALSE, message=FALSE}
-#create df of glass bottles to use for models
-mod_btl <- site_select %>%
-  filter(ID=="G1") %>% #glass bottles
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-  ungroup() %>%
-              mutate(Location = as.factor(Location),
-         Habitat = as.factor(Habitat))
-
-#GLM negative binomial with two variables and zero inflation
-# m_btl1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat*DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-
-m_btl  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_btl)
-
-# m_btl3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_btl)
-# 
-# 
-# AIC(m_btl1, m_btl, m_btl3) #keep habitat only
-
-```
-
-
-```{r model-summary-btl}
-summary(m_btl)
-coef(m_btl)
-```
-
-```{r simulation-output-m_btl}
-#simulation output for glass bottle counts
-simulationOutput_btl <- simulateResiduals(fittedModel = m_btl, plot=T)
-
-plotResiduals(simulationOutput_btl)
-
-testUniformity(simulationOutput_btl) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_btl) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_btl) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_btl) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_btl) #tests if there are more zeros than expected
-```
-
-```{r btl-predict}
-
-# Predictors for glass bottles are: Habitat, Coast
-
-nd_btl <- expand.grid(Habitat = unique(mod_btl$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_btl <- predict(object = m_btl,
-                         newdata = nd_btl,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_btl$Total <- pred_btl$fit
-nd_btl$SE_upper <- pred_btl$fit + pred_btl$se.fit
-nd_btl$SE_lower <- pred_btl$fit - pred_btl$se.fit
-
-#plot the predicted means
-
-p_btl <- ggplot(nd_btl, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
-   labs(title="Debris abundance predictions: Glass bottle",
-       subtitle="By habitat",
-       x="Habitat", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_btl
-
-ggsave(filename = "images/p_btl.svg", plot = p_btl, device="svg", height=7, width=7, units="in")
-```
-
-# Regression coefficients
-This is the mean change in the dependent (total debris) variable for each 1 unit change in an independent (habitat and distance) variable.  For instance, each km more from the harbour results in -0.327 less debris items.  Soft sediment sites are likely to have -3.556 less count per item than pier sites.
-
-
-# Testing temporal autocorrelation
-Despite repeat surveys at each site, temporal autocorrelation testing shows that the effect of repeat surveys is not significant.  This is likely due to the fact that the initial surveys did not actually function as baseline cleans because the sites took many trips to clean and pier sites were never cleared completely.
-```{r testing-temporal-autocorrelation, warning=FALSE, message=FALSE, results="hide"}
-#creating a column from the model residuals
-mod_hab$resid = resid(m_hab) #create a column for each survey event's residuals
-
-#Clifton Gardens - DW = 3.301, p-value = 0.05987
-  m_clift <- mod_hab %>%
-    filter(Location=="CLIFT") %>% 
-    group_by(Date) %>%
-    summarise(sum=sum(resid))
-  
-  testTemporalAutocorrelation(m_clift$sum, 
-                              time =  m_clift$Date) #test resid for temporal autocorrelation
-
-#Double Bay - DW = 2.2347, p-value = 0.8496
-  m_doubl <- mod_hab %>%
-    filter(Location=="DOUBL") %>%
-    group_by(Date) %>%
-    summarise(sum=sum(resid))
-  
-  testTemporalAutocorrelation(m_doubl$sum, 
-                              time =  m_doubl$Date) #test resid for temporal autocorrelation
-
-#Neutral Bay - DW = 2.767, p-value = 0.3581
-  m_neutr <- mod_hab %>%
-    filter(Location=="NEUTR") %>%
-    group_by(Date) %>%
-    summarise(sum=sum(resid))
-  
-  testTemporalAutocorrelation(m_neutr$sum, 
-                              time =  m_neutr$Date) #test resid for temporal autocorrelation
-#Parsley Bay - DW = 1.2492, p-value = 0.4578
-    m_parsl <- mod_hab %>%
-    filter(Location=="PARSL") %>%
-    group_by(Date) %>%
-    summarise(sum=sum(resid))
-  
-  testTemporalAutocorrelation(m_parsl$sum, 
-                              time =  m_parsl$Date) #test resid for temporal autocorrelation
-#Watsons Bay - DW = 2.8324, p-value = 0.3741
-    m_watso <- mod_hab %>%
-    filter(Location=="WATSO") %>%
-    group_by(Date) %>%
-    summarise(sum=sum(resid))
-  
-  testTemporalAutocorrelation(m_watso$sum, 
-                              time =  m_watso$Date) #test resid for temporal autocorrelation
-```
-# glm plastic
-```{r glm-plastic, warning=FALSE, message=FALSE}
-#create df of all plastic materials
-mod_plas <- site_select %>%
-  filter(Material=="Plastic") %>% 
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) 
-
-#GLM negative binomial with two variables and zero inflation
-m_plas  <- glmmTMB(Total ~ #Debris count
-                 Habitat*DistKm + #predicted by Habitat
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_plas) 
-
-# m_plas2  <- glmmTMB(Total ~ #Debris count
-#                  Habitat + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas) 
-# 
-# m_plas3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_plas) 
-# 
-# 
-# AIC(m_plas, m_plas2, m_plas3) #keep Habitat * DistKm
-
-```
-
-
-```{r model-summary-plas}
-summary(m_plas)
-coef(m_plas)
-```
-
-```{r simulation-output-plas}
-#simulation output for hook/sinker counts
-simulationOutput_plas <- simulateResiduals(fittedModel = m_plas, plot=T)
-  
-plotResiduals(simulationOutput_plas)
-
-testUniformity(simulationOutput_plas) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_plas) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_plas) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_plas) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_plas) #tests if there are more zeros than expected
-```
-```{r plastic-predict}
-
-# Predictors for plastic are: Habitat, DistKm
-
-nd_plas <- expand.grid(Habitat = unique(mod_plas$Habitat),
-                          DistKm = seq(from = min(mod_plas$DistKm),
-                               to = max(mod_plas$DistKm),
-                               length=1000),
-                  Location = NA,
-                  Date = NA)
-
-pred_plas <- predict(object = m_plas,
-                         newdata = nd_plas,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_plas$Total <- pred_plas$fit
-nd_plas$SE_upper <- pred_plas$fit + pred_plas$se.fit
-nd_plas$SE_lower <- pred_plas$fit - pred_plas$se.fit
-
-#plot the predicted means
-
-p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) +
-  geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
- labs(title="Debris abundance predictions: Plastic",
-       subtitle="By habitat and distance from harbour mouth",
-       x="Distance from harbour mouth (km)", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_plas
-
-ggsave(filename = "images/p_plas.svg", plot = p_plas, device="svg", height=7, width=7, units="in")
-```
-# glm other material
-```{r glm-othermat, warning=FALSE, message=FALSE}
-#create df of all misc materials
-mod_oth <- site_select %>%
-  filter(Material=="Other") %>% #rubber, cloth, e-waste, ceramic, timber, bricks, etc
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) %>%
-    ungroup() %>%
-    mutate(Location = as.factor(Location),
-    Habitat = as.factor(Habitat))
-
-# #GLM negative binomial with two variables and zero inflation
-# m_oth1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat*DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-
-m_oth  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
-                 (1|Location) + (1|Date), #site/date random effect
-               family=nbinom1(), #negative binomial to deal with count data and zeros
-               data = mod_oth)
-
-#GLM negative binomial with two variables and zero inflation
-# m_hook1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat * DistKm +
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_hook) 
-
-
-# m_oth3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_oth)
-# 
-# AIC(m_oth1, m_oth, m_oth3) #testing either dist, coast, with both, without both
-
-```
-
-
-```{r model-summary-oth}
-summary(m_oth)
-coef(m_oth)
-```
-
-```{r simulation-output-m_oth}
-#simulation output for misc materials
-simulationOutput_oth <- simulateResiduals(fittedModel = m_oth, plot=T)
-  
-plotResiduals(simulationOutput_oth)
-
-testUniformity(simulationOutput_oth) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_oth) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_oth) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_oth) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_oth) #tests if there are more zeros than expected
-```
-```{r other-predict}
-
-# Predictors for 'other' materials are: Habitat, Coast
-
-nd_oth <- expand.grid(Habitat = unique(mod_oth$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_oth <- predict(object = m_oth,
-                         newdata = nd_oth,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_oth$Total <- pred_oth$fit
-nd_oth$SE_upper <- pred_oth$fit + pred_oth$se.fit
-nd_oth$SE_lower <- pred_oth$fit - pred_oth$se.fit
-
-#plot the predicted means
-
-p_oth <- ggplot(nd_oth, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower, width=0.2), position=position_dodge(width=0.90)) +
- labs(title="Debris abundance predictions: Misc. material",
-       subtitle="By habitat",
-       x="Habitat", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_oth
-
-ggsave(filename = "images/p_oth.svg", plot = p_oth, device="svg", height=7, width=7, units="in")
-```
-# glm glass
-```{r glm-glsmat, warning=FALSE, message=FALSE}
-#create df of all misc materials
-mod_gls <- site_select %>%
-  filter(Material=="Glass") %>% #glass
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) 
-
-# #GLM negative binomial with two variables and zero inflation
-# m_gls1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat*DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-
 m_gls  <- glmmTMB(Total ~ #Debris count
-                 Habitat + #predicted by Habitat
+                 Habitat*DistKm + #predicted by Habitat
                  (1|Location) + (1|Date), #site/date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_gls)
 
-# m_gls3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_gls)
-# 
-# AIC(m_gls1, m_gls, m_gls3) #keep just habitat
-
-```
-
-
-```{r model-summary-gls}
-summary(m_gls)
-coef(m_gls)
-```
-
-```{r simulation-output-m_gls}
-#simulation output for misc materials
-simulationOutput_gls <- simulateResiduals(fittedModel = m_gls, plot=T)
+so_gls <- simulateResiduals(fittedModel = m_gls, plot=T)
   
-plotResiduals(simulationOutput_gls)
+plotResiduals(so_gls)
 
-testUniformity(simulationOutput_gls) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_gls) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_gls) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_gls) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_gls) #tests if there are more zeros than expected
+testUniformity(so_gls) #tests if the overall distribution conforms to expectations
+testOutliers(so_gls) #tests if there are more simulation outliers than expected
+testDispersion(so_gls) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_gls) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_gls) #tests if there are more zeros than expected
 ```
-
-```{r glass-predict}
-
-# Predictors for 'other' materials are: Habitat, Coast
-
-nd_gls <- expand.grid(Habitat = unique(mod_oth$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_gls <- predict(object = m_gls,
-                         newdata = nd_gls,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_gls$Total <- pred_gls$fit
-nd_gls$SE_upper <- pred_gls$fit + pred_gls$se.fit
-nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
-
-#plot the predicted means
-
-p_gls <- ggplot(nd_gls, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
- labs(title="Debris abundance predictions: Glass",
-       subtitle="By habitat",
-       x="Habitat", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_gls
-
-ggsave(filename = "images/p_gls.svg", plot = p_gls, device="svg", height=7, width=7, units="in")
-```
-# glm metal
-```{r glm-metmat, warning=FALSE, message=FALSE}
-#create df of all misc materials
+```{r model-verification-mat-met}
+#create df of all metal
 mod_met <- site_select %>%
   filter(Material=="Metal") %>% #glass
-  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
-  summarise(Total=sum(Total)) 
+  group_by(Date, Location, Habitat) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
-# #GLM negative binomial with two variables and zero inflation
-# m_met1  <- glmmTMB(Total ~ #Debris count
-#                  Habitat*DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
 
 m_met  <- glmmTMB(Total ~ #Debris count
                  Habitat + #predicted by Habitat
@@ -1025,262 +481,224 @@ m_met  <- glmmTMB(Total ~ #Debris count
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_met)
 
-# m_met3  <- glmmTMB(Total ~ #Debris count
-#                  DistKm + #predicted by Habitat
-#                  (1|Location) + (1|Date), #site/date random effect
-#                family=nbinom1(), #negative binomial to deal with count data and zeros
-#                data = mod_met)
-# 
-# AIC(m_met1, m_met2, m_met3) #habitat alone is simplest model with almost lowest AIC
+so_met <- simulateResiduals(fittedModel = m_met, plot=T)
+  
+plotResiduals(so_met)
+
+testUniformity(so_met) #tests if the overall distribution conforms to expectations
+testOutliers(so_met) #tests if there are more simulation outliers than expected
+testDispersion(so_met) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_met) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_met) #tests if there are more zeros than expected
+```
+```{r model-verification-mat-plas}
+#create df of all plastic
+mod_plas <- site_select %>%
+  filter(Material=="Plastic") %>% #glass
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+
+m_plas  <- glmmTMB(Total ~ #Debris count
+                 Habitat*DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_plas)
+
+so_plas <- simulateResiduals(fittedModel = m_plas, plot=T)
+  
+plotResiduals(so_plas)
+
+testUniformity(so_plas) #tests if the overall distribution conforms to expectations
+testOutliers(so_plas) #tests if there are more simulation outliers than expected
+testDispersion(so_plas) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_plas) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_plas) #tests if there are more zeros than expected
+```
+```{r emmeans-mat}
+#plastic
+      em_plas_hd <- emmeans(m_plas, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      em_plas_dh <- emmeans(m_plas, pairwise~ DistKm|Habitat , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      
+      em_plas1 <- summary(em_plas_hd$contrasts)
+      em_plas1$Trait = "Plastic"
+      
+      em_plas2 <- summary(em_plas_dh$contrasts)
+      em_plas2$Trait = "Plastic"
+      
+#metal
+      em_met <- emmeans(m_met, pairwise~Habitat, type="response", level=0.95, infer=T)
+      em_met <- summary(em_met$contrasts)
+      em_met$Trait = "Metal"
+      
+#glass
+      em_gls_hd <- emmeans(m_gls, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      em_gls_dh <- emmeans(m_gls, pairwise~ DistKm|Habitat , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      
+      em_gls1 <- summary(em_gls_hd$contrasts)
+      em_gls1$Trait = "Glass"
+      
+      em_gls2 <- summary(em_gls_dh$contrasts)
+      em_gls2$Trait = "Glass"
+```
+
+# Fishing classification
+
+```{r drop-levels-fish}
+options(scipen = 999)
+
+# Fishing interaction (significant)
+
+     fish_df <- site_select %>%
+      filter(Fishing == "Fishing") %>%
+      group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+      summarise(Total=sum(Total)) %>%
+      ungroup() %>%
+      mutate(Location = as.factor(Location),
+             Habitat = as.factor(Habitat))
+     
+     #create model
+      m_fish_int <- glmmTMB(Total ~ #Debris count
+                     Habitat * DistKm + #predicted by Habitat
+                     (1|Location) + (1|Date), #date random effect
+                   family=nbinom1(), #negative binomial to deal with count data and zeros
+                   data = fish_df)
+     
+    drop1_fish_int <- drop1(m_fish_int, test="Chisq") #Fishing: Habitat:DistKm  1 257.93 6.6198  0.01008 *
+    
+    drop1_fish_int <- drop1_fish_int %>%
+      filter(LRT != "NA") %>%
+      rename(p.value = 'Pr(>Chi)') %>%
+      mutate(Fishing = "Fishing", Model="Interaction")
+
+# NonFishing interaction (not significant)
+
+     nonfish_df <- site_select %>%
+      filter(Fishing == "Non-Fishing") %>%
+      group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+      summarise(Total=sum(Total)) %>%
+      ungroup() %>%
+      mutate(Location = as.factor(Location),
+             Habitat = as.factor(Habitat))
+     
+     #create model
+      m_nonfish_int <- glmmTMB(Total ~ #Debris count
+                     Habitat * DistKm + #predicted by Habitat
+                     (1|Location) + (1|Date), #date random effect
+                   family=nbinom1(), #negative binomial to deal with count data and zeros
+                   data = nonfish_df)
+     
+    drop1_nonfish_int <- drop1(m_nonfish_int, test="Chisq") #Fishing: Habitat:DistKm  1 257.93 6.6198  0.01008 *
+    
+    drop1_nonfish_int <- drop1_nonfish_int %>%
+      filter(LRT != "NA") %>%
+      rename(p.value = 'Pr(>Chi)') %>%
+      mutate(Fishing = "Non-Fishing", Model="Interaction")
+    
+# Fishing main effect (Habitat)
+     
+     #create model
+      m_nonfish_main <- glmmTMB(Total ~ #Debris count
+                     Habitat + DistKm + #predicted by Habitat
+                     (1|Location) + (1|Date), #date random effect
+                   family=nbinom1(), #negative binomial to deal with count data and zeros
+                   data = nonfish_df)
+     
+    drop1_nonfish_main <- drop1(m_nonfish_main, test="Chisq") #Fishing: Habitat:DistKm  1 257.93 6.6198  0.01008 *
+    
+    drop1_nonfish_main <- drop1_nonfish_main %>%
+      filter(LRT != "NA") %>%
+      rename(p.value = 'Pr(>Chi)') %>%
+      mutate(Fishing = "Non-Fishing", Model="Main")
+
+drop1_fishing <- rbind(drop1_nonfish_main, drop1_nonfish_int, drop1_fish_main, drop1_fish_int)
+# write.csv(drop1_fishing,"drop1_fishing.csv", row.names = T)
+```
+
+```{r model-verification-fishing}
+#create df of all plastic
+mod_fish <- site_select %>%
+  filter(Fishing=="Fishing") %>% #glass
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+
+m_fish  <- glmmTMB(Total ~ #Debris count
+                 Habitat*DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_fish)
+
+so_fish <- simulateResiduals(fittedModel = m_fish, plot=T)
+  
+plotResiduals(so_fish)
+
+testUniformity(so_fish) #tests if the overall distribution conforms to expectations
+testOutliers(so_fish) #tests if there are more simulation outliers than expected
+testDispersion(so_fish) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_fish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_fish) #tests if there are more zeros than expected
+```
+
+```{r model-verification-non-fishing}
+#create df of all metal
+mod_nonfish <- site_select %>%
+  filter(Fishing=="Non-Fishing") %>% 
+  group_by(Date, Location, Habitat) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+
+m_nonfish  <- glmmTMB(Total ~ #Debris count
+                 Habitat + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_nonfish)
+
+so_nonfish <- simulateResiduals(fittedModel = m_nonfish, plot=T)
+  
+plotResiduals(so_nonfish)
+
+testUniformity(so_nonfish) #tests if the overall distribution conforms to expectations
+testOutliers(so_nonfish) #tests if there are more simulation outliers than expected
+testDispersion(so_nonfish) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_nonfish) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_nonfish) #tests if there are more zeros than expected
 ```
 
 
-```{r model-summary-gls}
-summary(m_met)
-coef(m_met)
+```{r emmeans-fish}
+#plastic
+      em_fish_hd <- emmeans(m_fish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      em_fish_dh <- emmeans(m_fish, pairwise~ DistKm|Habitat , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      
+      em_fish1 <- summary(em_fish_hd$contrasts)
+      em_fish1$Trait = "Fishing"
+      
+      em_fish2 <- summary(em_fish_dh$contrasts)
+      em_fish2$Trait = "Fishing"
+      
+#metal
+      em_nonfish <- emmeans(m_nonfish, pairwise~Habitat, type="response", level=0.95, infer=T)
+      em_nonfish <- summary(em_nonfish$contrasts)
+      em_nonfish$Trait = "Non-Fishing"
 ```
 
-```{r simulation-output-m_met}
-#simulation output for misc materials
-simulationOutput_met <- simulateResiduals(fittedModel = m_met, plot=T)
-  
-plotResiduals(simulationOutput_met)
+```{r export-emmeans-tables}
+em_hd <- rbind(em_plas1, em_gls1, em_fish1)
+em_dh <- rbind(em_gls2, em_plas2, em_fish2)
+em_main <- rbind(em_met, em_nonfish)
 
-testUniformity(simulationOutput_met) #tests if the overall distribution conforms to expectations
-testOutliers(simulationOutput_met) #tests if there are more simulation outliers than expected
-testDispersion(simulationOutput_met) #tests if the simulated dispersion is equal to the observed dispersion
-testQuantiles(simulationOutput_met) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
-testZeroInflation(simulationOutput_met) #tests if there are more zeros than expected
+write.csv(em_hd,"em_hd.csv", row.names = T)
+write.csv(em_dh,"em_dh.csv", row.names = T)
+write.csv(em_main,"em_main.csv", row.names = T)
 ```
-
-```{r metal-predict}
-
-# Predictors for 'other' materials are: Habitat, Coast
-
-nd_met <- expand.grid(Habitat = unique(mod_met$Habitat),
-                  Location = NA,
-                  Date = NA)
-
-pred_met <- predict(object = m_met,
-                         newdata = nd_met,
-                         se.fit = T,
-                         re.form = NA,
-                         type="response")
-
-nd_met$Total <- pred_met$fit
-nd_met$SE_upper <- pred_met$fit + pred_met$se.fit
-nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
-
-#plot the predicted means
-
-p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) +
-  geom_col(aes(fill=Habitat)) +
-  geom_errorbar(aes(ymin=SE_lower, ymax=SE_upper, width=0.2), position=position_dodge(width=0.90)) +
- labs(title="Debris abundance predictions: Metal",
-       subtitle="By habitat",
-       x="Habitat", y="Total debris items", tag="") +
-  theme_minimal()
-
-p_met
-
-ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
-```
-```{r tidy-models}
-#Reference https://cran.r-project.org/web/packages/broom/vignettes/broom.html
-
-#This gives you a tabular data representation. Note that the row names have been moved into a column called term, and the column names are simple and consistent (and can be accessed using $).
-tidy(m_hab)
-
-#Instead of viewing the coefficients, you might be interested in the fitted values and residuals for each of the original points in the regression. For this, use augment, which augments the original data with information from the model:
-augment(m_hab)
-
-#Finally, several summary statistics are computed for the entire regression, such as R^2 and the F-statistic. These can be accessed with the glance function:
-glance(m_hab)
-```
-```{r tidy-tables}
-# Reference https://strengejacke.github.io/sjPlot/articles/tab_model_estimates.html
-#Base model
-tab_model(
-  m_hab,
-  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
-  col.order = c("est", "se", "p"),
-  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
-  dv.labels = c("Habitat"),
-  string.p = "P-Value",
-          string.est = "Estimate",
-          string.se = "Standard Error",
-          string.ci = "Conf. Int (95%)"
-)
-
-?tab_model
-
-
-#Fishing vs non-fishing
-tab_model(
-  m_fish, m_nonfish,
-  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
-  col.order = c("est", "se", "p"),
-  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
-  dv.labels = c("Fishing related debris", "Nonfishing related debris"),
-  string.p = "P-Value",
-          string.est = "Estimate",
-          string.se = "Standard Error",
-          string.ci = "Conf. Int (95%)"
-)
-
-#Top items
-tab_model(
-  m_F2, m_btl, m_hook,
-  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
-  col.order = c("est", "se", "p"),
-  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
-  dv.labels = c("Fishing line", "Glass bottles", "Fish hooks/sinkers"),
-  string.p = "P-Value",
-          string.est = "Estimate",
-          string.se = "Standard Error",
-          string.ci = "Conf. Int (95%)"
-)
-
-#Material types
-tab_model(
-  m_plas, m_gls, m_met, m_oth,
-  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
-  col.order = c("est", "se", "p"),
-  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
-  dv.labels = c("Plastic debris", "Glass debris", "Metal debris", "Other debris"),
-  string.p = "P-Value",
-          string.est = "Estimate",
-          string.se = "Standard Error",
-          string.ci = "Conf. Int (95%)"
-)
-
-#All
-tab_model(
-  m_hab, m_fish, m_nonfish, m_F2, m_btl, m_hook,
-  show.est=TRUE, show.ci=FALSE, show.se=TRUE, show.p=TRUE,
-  col.order = c("est", "se", "p"),
-  pred.labels = c("Intercept", "Habitat (Sediment)", "Distance from Harbour Mouth", "Coast (South)"),
-  dv.labels = c("Habitat", "Fishing related debris", "Non-fishing related debris", "Fishing line", "Glass bottles", "Fish hooks/sinkers"),
-  string.p = "P-Value",
-          string.est = "Estimate",
-          string.se = "Standard Error",
-          string.ci = "Conf. Int (95%)"
-)
-```
-## Ordination
-```{r vegan}
-
-#Abundance data
-  #Filter for top items
-top10 <- site_select %>%
-  group_by(Label) %>%
-  summarise(sum=sum(Total)) %>%
-  arrange(desc(sum)) %>%
-  top_n(10, sum)
-
-#create vector from top 10 items
-top10 <- top10$Label
-top10 <- unlist(top10)
-site_select_top10 <- site_select %>%
-  filter(Label %in% top10)
-
-# site_select_top20 <- site_select %>%
-# filter(ID %in% c("F2", "F6", "M10", "F7", "Z2", "Z5", "G1", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4"))
-
-  #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select_top10 %>%
-    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, Location, Habitat, Date, Label) %>% 
-    summarise(sum=sum(Total)) %>% #total of each item type per survey event
-  group_by(Label) %>%
-  filter(sum>0) %>% #filter IDs that have no values across all surveys
-  ungroup()
-  
-  #convert to data wide
-  abund <- spread(abund_long, Label, sum) 
-  
-  #replace na values with 0
-  abund[is.na(abund)] <- 0
-  
-  #convert survey event to rowname
-  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
-  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
-  
-  com <- abund[4:13]
-  
-  ord <- metaMDS(com)
-  
-  data.scores <- as.data.frame(scores(ord)) #create df of ord points
-  data.scores$Location <- abund$Location
-  data.scores$Habitat <- abund$Habitat
-  data.scores <- data.scores %>%
-    mutate(Habitat = as.factor(Habitat),
-           Location = as.factor(Location))
-  
-  species.scores <- as.data.frame(scores(ord, "species"))
-  species.scores$item <- rownames(species.scores) #create item id column
-  
-  Pier <- data.scores[data.scores$Habitat == "P", ][chull(data.scores[data.scores$Habitat ==
-    "P", c("NMDS1", "NMDS2")]), ]  # hull values for Pier
-Sediment <- data.scores[data.scores$Habitat == "SS", ][chull(data.scores[data.scores$Habitat ==
-    "SS", c("NMDS1", "NMDS2")]), ]  # hull values for Sediment
-#create polygons
-hull.data <- rbind(Pier, Sediment)  #combine groups
-hull.data
-
-  ggplot() +
-  geom_polygon(data=hull.data,aes(x=NMDS1,y=NMDS2,fill=Habitat),alpha=0.1) +
-  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
-  geom_point(data=data.scores, 
-             aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
-  coord_equal() +
-  theme_bw()
-
-#call svg command to start the plot
-svg(file = "images/MDS_veg.svg",   # The directory you want to save the file in
-    width = 11, # The width of the plot in inches
-    height = 7) # The height of the plot in inches
-
-#create the plot
-plot(ord, type = "n")
-points(ord, display = "sites", cex = 0.8, pch=21, col="red", bg="yellow")
-text(ord, display = "spec", cex=0.7, col="blue")
-
-# Step 3: Run dev.off() to create the file
-dev.off()
-
-```
-```{r MDS-tut}
-#reference http://environmentalcomputing.net/multidimensional-scaling/
-
-# #df with only abundance
-# abund_community <- abund[5:22]
-
-#create a dissimilarity matrix that measures similarity between every pair of samples
-abund_community.mds <- metaMDS(comm = abund_community, distance = "bray", trace = FALSE, autotransform = FALSE)
-
-#create MDS ordination plot
-plot(abund_community.mds$points)
-
-#extract x-y coords to new df
-MDS_xy <- data.frame(abund_community.mds$points)
-
-#add habitat and location to these coordinates
-MDS_xy$Habitat <- abund$Habitat
-MDS_xy$Location <- abund$Location
-
-# rename.values(MDS_xy$Habitat, c(P="Pier", SS="Sediment"))
-
-MDS_ec <- ggplot(MDS_xy, aes(MDS1, MDS2, color = Habitat)) + geom_point() + theme_bw()
-
-MDS_ec
-
-ggsave(filename = "images/MDS_ec.svg", plot = MDS_ec, device="svg", height=7, width=11, units="in")
-
-#not greater than 0.2
-abund_community.mds$stress
-
-#see https://rdrr.io/bioc/limma/man/plotMDS.html for symbology
-```
-
 
