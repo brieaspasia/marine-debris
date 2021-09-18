@@ -98,6 +98,9 @@ library(vegan)
   site_attr <- site_attr %>%
     dplyr::select(Site, CostDis, Coast) %>% #select only distance to harbour mouth for join
     mutate(DistKm = CostDis/100) #distance to harbour mouth
+  
+    #join distance to mouth to main dataset
+  site_select <- left_join(site_select, site_attr, by="Site") 
     
   #hab labels
   
@@ -191,6 +194,9 @@ m_hab  <- glmmTMB(Total ~ #Debris count
                  (1|Location) + (1|Date), #date random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_hab)
+
+drop1_hab <- drop1(m_hab, test="Chisq")
+drop1_hab
 
 # Predictors are: Habitat + DistKm
 

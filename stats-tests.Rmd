@@ -9,10 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
 library(ggplot2) #graphing
 library(ggthemes) #graphing templates
@@ -102,6 +98,71 @@ library(emmeans) #pairwise comparisons
     
   #join distance to mouth to main dataset
   site_select <- left_join(site_select, site_attr, by="Site") 
+```
+
+## total
+
+```{r drop1-total}
+# Total interaction  0.051
+  mod <- site_select %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+ 
+ #create model
+  m_tot  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod)
+ 
+drop1_tot <- drop1(m_tot, test="Chisq")
+
+drop1_tot
+```
+```{r model-verification-total}
+
+#create df to use for models
+ mod <- site_select %>%
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+  mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
+
+#create model
+  m_tot  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod)
+
+so_tot <- simulateResiduals(fittedModel = m_tot, plot=T)
+  
+plotResiduals(so_tot)
+
+testUniformity(so_tot) #tests if the overall distribution conforms to expectations
+testOutliers(so_tot) #tests if there are more simulation outliers than expected
+testDispersion(so_tot) #tests if the simulated dispersion is equal to the observed dispersion
+testQuantiles(so_tot) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+testZeroInflation(so_tot) #tests if there are more zeros than expected
+```
+
+```{r emmeans-total}
+# Total
+      em_tot_hd <- emmeans(m_tot, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      em_tot_dh <- emmeans(m_tot, pairwise~ DistKm|Habitat , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
+      
+      em_tot1 <- summary(em_tot_hd$contrasts)
+      em_tot1$Trait = "Total"
+      
+      em_tot2 <- summary(em_tot_dh$contrasts)
+      em_tot2$Trait = "Total"
+      
+      em_tot1
+      em_tot2
 ```
 
 ## items
@@ -437,7 +498,7 @@ write.csv(drop1_mat,"drop1_mat.csv", row.names = T)
 ```
 
 
-```{r model-verification-mat-glass}
+```{r model-verification-mat-glass-int}
 #create df of all glass
 mod_gls <- site_select %>%
   filter(Material=="Glass") %>% #glass
@@ -463,6 +524,35 @@ testOutliers(so_gls) #tests if there are more simulation outliers than expected
 testDispersion(so_gls) #tests if the simulated dispersion is equal to the observed dispersion
 testQuantiles(so_gls) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(so_gls) #tests if there are more zeros than expected
+```
+```{r model-verification-mat-glass-main}
+# #create df of all glass
+# mod_gls <- site_select %>%
+#   filter(Material=="Glass") %>% #glass
+#   group_by(Date, Location, Habitat) %>% #relevant variables
+#   summarise(Total=sum(Total)) %>%
+#   ungroup() %>%
+#   mutate(Location = as.factor(Location),
+#          Habitat = as.factor(Habitat))
+# 
+# 
+# m_gls  <- glmmTMB(Total ~ #Debris count
+#                  Habitat + #predicted by Habitat
+#                  (1|Location) + (1|Date), #site/date random effect
+#                family=nbinom1(), #negative binomial to deal with count data and zeros
+#                data = mod_gls)
+# 
+# so_gls <- simulateResiduals(fittedModel = m_gls, plot=T)
+#   
+# plotResiduals(so_gls)
+# 
+# testUniformity(so_gls) #tests if the overall distribution conforms to expectations
+# testOutliers(so_gls) #tests if there are more simulation outliers than expected
+# testDispersion(so_gls) #tests if the simulated dispersion is equal to the observed dispersion
+# testQuantiles(so_gls) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
+# testZeroInflation(so_gls) #tests if there are more zeros than expected
+# 
+# summary(m_gls)
 ```
 ```{r model-verification-mat-met}
 #create df of all metal
@@ -518,6 +608,28 @@ testDispersion(so_plas) #tests if the simulated dispersion is equal to the obser
 testQuantiles(so_plas) #fits a quantile regression or residuals against a predictor (default predicted value), and tests of this conforms to the expected quantile
 testZeroInflation(so_plas) #tests if there are more zeros than expected
 ```
+```{r summary-mat}
+glmm_met <- summary(m_met)
+glmm_met <- as.data.frame(glmm_met$coefficients$cond)
+glmm_met <- glmm_met %>%
+  mutate(Trait = "Metal")
+
+glmm_plas <- summary(m_plas)
+glmm_plas <- as.data.frame(glmm_plas$coefficients$cond)
+glmm_plas <- glmm_plas %>%
+  mutate(Trait = "Plastic")
+
+glmm_gls <- summary(m_gls)
+glmm_gls <- as.data.frame(glmm_gls$coefficients$cond)
+glmm_gls <- glmm_gls %>%
+  mutate(Trait = "Glass")
+
+
+glmm_mat <- rbind(glmm_plas, glmm_met, glmm_gls)
+
+write.csv(glmm_mat, "glmm_mat.csv", row.names=T)
+```
+
 ```{r emmeans-mat}
 #plastic
       em_plas_hd <- emmeans(m_plas, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
@@ -674,9 +786,25 @@ testQuantiles(so_nonfish) #fits a quantile regression or residuals against a pre
 testZeroInflation(so_nonfish) #tests if there are more zeros than expected
 ```
 
+```{r summary-fish}
+glmm_fish <- summary(m_fish)
+glmm_fish <- as.data.frame(glmm_fish$coefficients$cond)
+glmm_fish <- glmm_fish %>%
+  mutate(Trait = "Fishing")
+
+glmm_nonfish <- summary(m_nonfish)
+glmm_nonfish <- as.data.frame(glmm_nonfish$coefficients$cond)
+glmm_nonfish <- glmm_nonfish %>%
+  mutate(Trait = "Non-Fishing")
+
+glmm_fishing <- rbind(glmm_fish, glmm_nonfish)
+
+write.csv(glmm_fishing, "glmm_fishing.csv", row.names=T)
+```
+
 
 ```{r emmeans-fish}
-#plastic
+# fishing
       em_fish_hd <- emmeans(m_fish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
       em_fish_dh <- emmeans(m_fish, pairwise~ DistKm|Habitat , at=list(DistKm=c(1,8)), type="response", level=0.95, infer=T)
       
@@ -686,7 +814,7 @@ testZeroInflation(so_nonfish) #tests if there are more zeros than expected
       em_fish2 <- summary(em_fish_dh$contrasts)
       em_fish2$Trait = "Fishing"
       
-#metal
+# nonfishing
       em_nonfish <- emmeans(m_nonfish, pairwise~Habitat, type="response", level=0.95, infer=T)
       em_nonfish <- summary(em_nonfish$contrasts)
       em_nonfish$Trait = "Non-Fishing"
