@@ -597,6 +597,69 @@ options(scipen = 999)
       
       p_gls
 ```
+```{r print-mat-figs}
+# run chunk 9 first
+
+#glass material type
+        p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) + 
+                geom_line(aes(col=Habitat)) +
+                labs(title="Debris abundance predictions",
+                            subtitle="By habitat and distance from harbour mouth",
+                            x="Distance from harbour mouth (km)", y="Total glass items", tag="") +
+                geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+                theme(legend.position = "none",
+                title = element_blank(),
+                panel.grid = element_blank(),
+                axis.title = element_blank(),
+                axis.text = element_blank(),
+                panel.background = element_blank())
+        
+        p_gls
+        
+        svg("images/p_gls.svg")
+        plot(p_gls, height=7, width=7, units="in")
+        dev.off()
+        
+#metal material type
+        p_met <- ggplot(nd_met, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(title="Debris abundance predictions",
+             subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total metal items", tag="") +
+        geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
+        theme(legend.position = "none",
+                title = element_blank(),
+                panel.grid = element_blank(),
+                axis.title = element_blank(),
+                axis.text = element_blank(),
+                panel.background = element_blank())
+        
+        p_met
+        
+        svg("images/p_met.svg")
+        plot(p_met, height=7, width=7, units="in")
+        dev.off()
+        
+#plastic material type
+        p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) + 
+        geom_line(aes(col=Habitat)) +
+        labs(title="Debris abundance predictions",
+                    subtitle="By habitat and distance from harbour mouth",
+                    x="Distance from harbour mouth (km)", y="Total plastic items", tag="") +
+        geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+        theme(legend.position = "none",
+                title = element_blank(),
+                panel.grid = element_blank(),
+                axis.title = element_blank(),
+                axis.text = element_blank(),
+                panel.background = element_blank())
+      
+      p_plas
+      
+      svg("images/p_plas.svg")
+        plot(p_plas, height=7, width=7, units="in")
+        dev.off()
+```
 ```{r glmm-fish, warning=FALSE, message=FALSE}
 
 # Fishing items
@@ -693,6 +756,51 @@ options(scipen = 999)
             p_nonfish
 
 ```
+```{r print-fish-figs}
+# run chunk 11 glmm-fish first
+
+#classed as fishing related
+        p_fish <- ggplot(nd_fish, aes(y=Total, x=DistKm)) + 
+                geom_line(aes(col=Habitat)) +
+                labs(title="Debris abundance predictions",
+                            subtitle="By habitat and distance from harbour mouth",
+                            x="Distance from harbour mouth (km)", y="Total fishing items", tag="") +
+                geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) +
+                theme(legend.position = "none",
+                title = element_blank(),
+                panel.grid = element_blank(),
+                axis.title = element_blank(),
+                axis.text = element_blank(),
+                panel.background = element_blank())
+        
+        p_fish
+        
+        svg("images/p_fish.svg")
+        plot(p_fish, height=7, width=7, units="in")
+        dev.off()
+        
+#classed as nonfishing related
+        p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=Habitat)) + 
+        geom_col(aes(fill=Habitat)) +
+        labs(title="Debris abundance predictions",
+             subtitle="By habitat and distance from harbour mouth",
+             x="Habitat", y="Total nonfish items", tag="") +
+          geom_errorbar(aes(ymax = SE_upper, ymin = SE_lower), alpha=0.2) +
+        theme(legend.position = "none",
+                title = element_blank(),
+                panel.grid = element_blank(),
+                axis.title = element_blank(),
+                axis.text = element_blank(),
+                panel.background = element_blank())
+        
+        p_nonfish
+        
+        svg("images/p_nonfish.svg")
+        plot(p_nonfish, height=7, width=7, units="in")
+        dev.off()
+```
+
+
 ## Testing non-fishing related debris
 ```{r glm-nonfish, warning=FALSE, message=FALSE}
 #create df to use for models
@@ -1219,7 +1327,7 @@ Here we see that nothing is interacting significantly with distance to harbour m
   #alphabatising variables to force intercepts
   TR$Material <- recode_factor(TR$Material, Other = "AOther")
   TR$Fishing <- recode_factor(TR$Fishing, 'Non-fishing' = "ANon-fishing")
-  TR$Dispersiveness <- recode_factor(TR$Dispersiveness, 'Limited dispersion' = "ALimited dispersion")
+  TR$Dispersiveness <- recode_factor(TR$Dispersiveness, 'Very mobile' = "AVery mobile")
 
 y <- as.matrix(abund)
 X <- scale(as.matrix(env))
