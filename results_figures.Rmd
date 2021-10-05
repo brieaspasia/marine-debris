@@ -18,7 +18,7 @@ library(forcats) #working with factors
 library(tidyverse) #manipulating data
 library(knitr) #rmarkdown functions
 #library(kableExtra) #table layouts
-library(magick) #image processing
+# library(magick) #image processing
 library(stats) #R stats functions
 library(broom) #create summaries from stats objects
 library(car) #lm regression
@@ -27,7 +27,7 @@ library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
-library(gllvm) #for multivariate abundance
+# library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
 library(vegan)
 ```
@@ -132,7 +132,7 @@ get_mean <- site_select %>%
   summarise(sum=sum(Total)) %>%
   spread(Habitat, sum) %>%
   rowwise() %>% 
-  mutate( mean = mean(c(P,SS) ))
+  mutate( mean = mean(c(Pier, Sediment) ))
 
 top_lol <- site_select %>%
   filter(ID %in% top20) %>%
@@ -143,15 +143,15 @@ top_lol <- site_select %>%
   Label=fct_reorder( Label, mean, .desc=TRUE)) %>%
   ungroup()
 
-HabitatLabs <- c(P = "Pier", SS = "Sediment")
-top_lol$Habitat[top_lol$Habitat == "P"] <-"Pier"
-top_lol$Habitat[top_lol$Habitat == "SS"] <-"Sediment"
+# HabitatLabs <- c(P = "Pier", SS = "Sediment")
+# top_lol$Habitat[top_lol$Habitat == "P"] <-"Pier"
+# top_lol$Habitat[top_lol$Habitat == "SS"] <-"Sediment"
 
 p_top_lol <- top_lol %>% 
   ungroup() %>%
   mutate(Label=as.factor(Label),
   Label=fct_reorder(Label, mean)) %>%
-  dplyr::select(-P, -SS) %>%
+  dplyr::select(-Pier, -Sediment) %>%
   ggplot( aes(x=sum, y=Label)) +
   scale_x_log10() +
   geom_linerange( aes(xmin=0, xmax=sum, y=Label, colour=Habitat), position=position_dodge(.5)) +
@@ -966,7 +966,7 @@ nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
 
 p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) +
   geom_line(aes(col=Habitat)) +
-  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) 
    # theme(legend.position = "none",
    #      panel.grid = element_blank(),
    #      axis.title = element_blank(),
@@ -1162,7 +1162,7 @@ site_select_top20 <- site_select %>%
   #create abundance dataframe with ID as columns and survey events as rows
   abund_long <- site_select_top20 %>%
     mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, Location, Habitat, Date, Label) %>% 
+    group_by(survey_event, DistKm, Habitat, Date, Label) %>% 
     summarise(sum=sum(Total)) %>% #total of each item type per survey event
   group_by(Label) %>%
   filter(sum>0) %>% #filter IDs that have no values across all surveys
@@ -1179,21 +1179,24 @@ site_select_top20 <- site_select %>%
   abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
   
   com <- abund[4:23]
+  env <- abund[1:2]
   
   ord <- metaMDS(com)
   
   ord$stress 
   #0.167787
   
+  # https://jkzorz.github.io/2020/04/04/NMDS-extras.html
+  en = envfit(ord, env, permutations = 999, na.rm = TRUE)
+  en
+  
   data.scores <- as.data.frame(scores(ord)) #create df of ord points
-  data.scores$Location <- abund$Location
+  data.scores$DistKm <- abund$DistKm
   data.scores$Habitat <- abund$Habitat
-  data.scores <- data.scores %>%
-    mutate(Habitat = as.factor(Habitat),
-           Location = as.factor(Location))
   
   species.scores <- as.data.frame(scores(ord, "species"))
   species.scores$item <- rownames(species.scores) #create item id column
+
 
 #create ellipsis
 #add group column to data.scores
@@ -1243,6 +1246,27 @@ dev.off()
 # plot(p_ord_txt, height=7, width=11, units="in")
 # dev.off()
 
+```
+
+```{r adonis-pairwise, warning=FALSE, message=FALSE}
+# https://jkzorz.github.io/2020/04/04/NMDS-extras.html
+
+#Both land use and covid have significant scores, but there is not a significant interaction between them 
+df.adonis <- adonis(com ~ data.scores$Habitat*data.scores$DistKm, permutations=999, method="bray")
+df.adonis
+
+
+#testing habitat dispersion
+df.dis <- vegdist(com, method = "bray") # make a distance matrix
+df.betadisper.hab <- betadisper(df.dis, data.scores$Habitat) # test dispersion
+df.betadisper.hab
+permutest(df.betadisper.hab) #0.003
+#testing dist dispersion
+df.dis <- vegdist(com, method = "bray") # make a distance matrix
+df.betadisper.dist <- betadisper(df.dis, data.scores$DistKm) # test dispersion
+df.betadisper.dist
+permutest(df.betadisper.dist) #0.015
+citation("pairwiseAdonis")
 ```
 ## gllvm analysis
 Determining the significance of environmental traits and debris attributes.
