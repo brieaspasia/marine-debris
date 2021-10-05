@@ -1190,6 +1190,9 @@ site_select_top20 <- site_select %>%
   en = envfit(ord, env, permutations = 999, na.rm = TRUE)
   en
   
+en_coord_cont = as.data.frame(scores(en, "vectors")) * ordiArrowMul(en)
+en_coord_cat = as.data.frame(scores(en, "factors")) * ordiArrowMul(en)
+  
   data.scores <- as.data.frame(scores(ord)) #create df of ord points
   data.scores$DistKm <- abund$DistKm
   data.scores$Habitat <- abund$Habitat
@@ -1220,6 +1223,12 @@ NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.sco
              aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
   geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
             size=1, linetype=2) +
+    geom_segment(aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2), 
+       data = en_coord_cont, size =1, alpha = 0.5, colour = "grey30") +
+     geom_text(data = en_coord_cat, aes(x = NMDS1, y = NMDS2+0.04), 
+       label = row.names(en_coord_cat), colour = "navy", fontface = "bold") + 
+     geom_text(data = en_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30", 
+       fontface = "bold", label = row.names(en_coord_cont)) + 
   coord_equal() +
    theme(legend.position = "none",
         panel.background = element_blank())
