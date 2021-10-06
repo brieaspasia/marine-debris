@@ -1146,18 +1146,19 @@ p_ord_txt
 ```{r vegan-20}
 
 #Abundance data
-#   #Filter for top items
-# top20 <- site_select %>%
-#   group_by(Label) %>%
-#   summarise(sum=sum(Total)) %>%
-#   arrange(desc(sum)) %>%
-#   top_n(20, sum)
-# 
-# #create vector from top 20 items
-# top20 <- top20$Label
-# top20 <- unlist(top20)
-site_select_top20 <- site_select %>%
-  filter(ID %in% top20)
+  #Filter for top items
+top20 <- site_select %>%
+  group_by(Label) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(20, sum)
+
+ #create vector from top 20 items
+ top20 <- top20$Label
+ top20 <- unlist(top20)
+
+ site_select_top20 <- site_select %>%
+   filter(Label %in% top20)
 
   #create abundance dataframe with ID as columns and survey events as rows
   abund_long <- site_select_top20 %>%
@@ -1260,22 +1261,39 @@ dev.off()
 ```{r adonis-pairwise, warning=FALSE, message=FALSE}
 # https://jkzorz.github.io/2020/04/04/NMDS-extras.html
 
-#Both land use and covid have significant scores, but there is not a significant interaction between them 
+#Both hab and dist are significant, as is the interaction
 df.adonis <- adonis(com ~ data.scores$Habitat*data.scores$DistKm, permutations=999, method="bray")
 df.adonis
 
+# https://search.r-project.org/CRAN/refmans/vegan/html/permutest.betadisper.html
 
 #testing habitat dispersion
 df.dis <- vegdist(com, method = "bray") # make a distance matrix
 df.betadisper.hab <- betadisper(df.dis, data.scores$Habitat) # test dispersion
 df.betadisper.hab
-permutest(df.betadisper.hab) #0.003
+perm.hab <- permutest(df.betadisper.hab) 
 #testing dist dispersion
 df.dis <- vegdist(com, method = "bray") # make a distance matrix
 df.betadisper.dist <- betadisper(df.dis, data.scores$DistKm) # test dispersion
 df.betadisper.dist
-permutest(df.betadisper.dist) #0.015
-citation("pairwiseAdonis")
+perm.dist <- permutest(df.betadisper.dist) 
+
+## Tukey's Honest Significant Differences
+TKhab <- TukeyHSD(df.betadisper.hab)
+plot(TKhab)
+
+TKdist <- TukeyHSD(df.betadisper.dist)
+plot(TKdist)
+
+
+pstat.hab <- permustats(perm.hab)
+densityplot(pstat.hab, scales = list(x = list(relation = "free")))
+qqmath(pstat.hab, scales = list(relation = "free"))
+
+pstat.dist <- permustats(perm.dist)
+densityplot(pstat.dist, scales = list(x = list(relation = "free")))
+qqmath(pstat.dist, scales = list(relation = "free"))
+
 ```
 ## gllvm analysis
 Determining the significance of environmental traits and debris attributes.
