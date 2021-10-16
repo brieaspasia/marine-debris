@@ -11,7 +11,9 @@ output:
   pdf_document:
     toc: yes
 ---
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
 #for working with scopus metadata
@@ -40,9 +42,7 @@ webshot::install_phantomjs()
 library(circlize)
 ```
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+
 
 ## Data Extraction
 
@@ -339,6 +339,9 @@ Clusters <-
 ```
 ### Visualisation of all keywords
 ```{r topics-total}
+#load bibliometrix object
+load(file = "./data/bib.RData") #load the bibliometrix object
+
 head(bib$DE) #check data
 words_total_DE <- bib$DE #assign data
 words_total_DE <- unlist(strsplit(words_total_DE, ";")) #split the records into individual keywords
@@ -370,9 +373,10 @@ keywords <- word_table_total %>%
   group_by(Keyword) %>% #find duplicate matches
   mutate(Total=sum(Freq)) %>% #add duplicate occurrences
            ungroup() %>%
-  select(-Freq) 
+  select(-Freq) %>%
+  distinct()
 
-write.csv(keywords, "output/keywords_total.csv", row.names = FALSE) #save this data frame as a csv file
+write.csv(keywords, "data/keywords_total.csv", row.names = FALSE) #save this data frame as a csv file
 
 #rename the count to freq for the wordcloud
 colnames(keywords)[colnames(keywords) == "Keyword"] <- "word" #rename for wordcloud2
