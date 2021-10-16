@@ -1,0 +1,141 @@
+---
+title: "thesis-keywords"
+author: "Brie Sherow"
+date: "17/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libraries, warning=FALSE, message=FALSE, results='hide'}
+#for working with scopus metadata
+library(bibliometrix)
+#for cleaning and processing data
+library(tidyverse)
+library(data.table)
+library(dplyr)
+#for graphing
+library(ggplot2)
+#for clean display of tables and code
+library(knitr)
+library(kableExtra)
+```
+
+```{r scopus-colnames}
+read.csv('data/scopus_colnames.csv', header=FALSE, fileEncoding="UTF-8-BOM") %>%
+  kable("html", col.names = c("Scopus Code", "Meaning")) %>% kable_styling() %>% #format table
+  scroll_box(width = "100%", height = "500px") #format scroll box
+```
+
+## Data Exploration
+
+### Loading SCOPUS dataset
+```{r load-data, results='hide'}
+# Load bibtex files and format into bibliometrix object
+bib.71 <- convert2df(file = c("./data/70-99.bib", "./data/00.bib"), dbsource = "scopus", format = "bibtex")
+
+bib.01 <- convert2df(file = c("./data/01-05.bib", "./data/06-10.bib"), dbsource = "scopus", format = "bibtex")
+
+bib.11 <- convert2df(file = c("./data/11-14.bib", "./data/17_20.bib", "./data/15-16_18.bib", "./data/19.bib"), dbsource = "scopus", format = "bibtex")
+
+
+save(bib.71, file = "./data/bib_71.RData") #save this data frame as RData
+save(bib.01, file = "./data/bib_01.RData") #save this data frame as RData
+save(bib.11, file = "./data/bib_11.RData") #save this data frame as RData
+```
+
+### Publications analysis
+```{r analysis-and-summary}
+results.71 <- biblioAnalysis(bib.71, sep=";") #high level analysis of scopus metadata
+save(results.71, file = "./data/results_71.RData") #save this bibliometrix file as RData
+options(width=100) #plot max number of columns
+S.71 <- summary(object = results.71, k = 10, pause = FALSE) #extracting biblioAnalysis results into a list
+
+results.01 <- biblioAnalysis(bib.01, sep=";") #high level analysis of scopus metadata
+save(results.01, file = "./data/results_01.RData") #save this bibliometrix file as RData
+options(width=100) #plot max number of columns
+S.01 <- summary(object = results.01, k = 10, pause = FALSE) #extracting biblioAnalysis results into a list
+
+results.11 <- biblioAnalysis(bib.11, sep=";") #high level analysis of scopus metadata
+save(results.11, file = "./data/results_11.RData") #save this bibliometrix file as RData
+options(width=100) #plot max number of columns
+S.11 <- summary(object = results.11, k = 10, pause = FALSE) #extracting biblioAnalysis results into a list
+```
+
+### Annual increase in publications
+```{r publications-per-year, results='hide'}
+#total articles published per year
+annual_prod <- print(S$AnnualProduction) #extracting df from summary list
+names(annual_prod)[1] <- "Year" #rename to clean leading and trailing whitespace 
+as.Date(annual_prod$Year, format="%Y") #set year to date format
+
+#Create clean graph to annotate later
+ ggplot(annual_prod, aes(Year, Articles, group=1)) + #visualise articles per year
+          geom_point() + #set points to show each year
+          geom_line() + #set line to show trends over time
+     #declutter labels
+          labs(title = "Marine Debris Research", subtitle = "articles published per year", x="Year", y="Articles") +
+          scale_x_discrete(breaks = seq(1980, 2020, by = 5)) + 
+          theme(axis.text.x = element_text(size = 8, angle = 90),
+                axis.text.y = element_text(size = 8),
+                panel.background = element_blank(),
+                axis.title.y = element_text(size = rel(1.8)),
+                axis.title.x = element_text(size = rel(1.8)),
+                plot.title = element_text(lineheight=3, face="bold", color="black", size=18),
+                plot.subtitle = element_text(lineheight=3, face="bold", color="black", size=12))
+
+#save output into png graphic
+ggsave(filename="figures/papers_per_year.png", width=11, height=9.5, units ="in")
+```
+
+```{r topics-total}
+#load bibliometrix object
+load(file = "./data/bib.RData") #load the bibliometrix object
+
+head(bib$DE) #check data
+words_total_DE <- bib$DE #assign data
+words_total_DE <- unlist(strsplit(words_total_DE, ";")) #split the records into individual keywords
+words_total_DE <- words_total_DE[order(words_total_DE)] #order alphabetically
+words_total_DE <- gsub("^\\s+|\\s+$", "", words_total_DE) #trim white space
+word_table_total_DE <- table(words_total_DE) #determine frequency of words
+word_table_total_DE <- as.data.frame(word_table_total_DE) #transform to df
+word_table_total_DE$Keyword = word_table_total_DE$words_total_DE
+word_table_total_DE <- word_table_total_DE %>%
+  select(Keyword, Freq)
+
+#rename words_total to keyword, and then merge ID and DE datasets, adding up totals for duplicate words
+
+head(bib$ID) #check data
+words_total_ID <- bib$ID #assign data
+words_total_ID <- unlist(strsplit(words_total_ID, ";")) #split the records into individual keywords
+words_total_ID <- words_total_ID[order(words_total_ID)] #order alphabetically
+words_total_ID <- gsub("^\\s+|\\s+$", "", words_total_ID) #trim white space
+word_table_total_ID <- table(words_total_ID) #determine frequency of words
+word_table_total_ID <- as.data.frame(word_table_total_ID) #transform to df
+word_table_total_ID$Keyword = word_table_total_ID$words_total_ID
+word_table_total_ID <- word_table_total_ID %>%
+  select(Keyword, Freq)
+
+word_table_total <- 
+  rbind(word_table_total_DE, word_table_total_ID) #append author words to journal words
+
+keywords <- word_table_total %>%
+  group_by(Keyword) %>% #find duplicate matches
+  mutate(Total=sum(Freq)) %>% #add duplicate occurrences
+           ungroup() %>%
+  select(-Freq) %>%
+  distinct()
+
+write.csv(keywords, "data/keywords_total.csv", row.names = FALSE) #save this data frame as a csv file
+
+#rename the count to freq for the wordcloud
+colnames(keywords)[colnames(keywords) == "Keyword"] <- "word" #rename for wordcloud2
+colnames(keywords)[colnames(keywords) == "Total"] <- "freq" #rename for wordcloud2
+keywords <- keywords %>% dplyr::filter(freq>2) #remove low values
+
+ #writing wordcloud graphic
+  wc_total <- wordcloud2(keywords, shape='rectangle')
+  wc_total
+```
