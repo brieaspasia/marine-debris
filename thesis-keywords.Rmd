@@ -21,6 +21,11 @@ library(ggplot2)
 #for clean display of tables and code
 library(knitr)
 library(kableExtra)
+#netowrk manipulation
+library(ggnet)
+library(network)
+library(sna)
+# devtools::install_github("briatte/ggnet")
 ```
 
 ```{r scopus-colnames}
@@ -92,43 +97,152 @@ ggsave(filename="figures/papers_per_year.png", width=11, height=9.5, units ="in"
 
 ```{r topics-total}
 #load bibliometrix object
-load(file = "./data/bib.RData") #load the bibliometrix object
+load(file = "./data/bib_71.RData") #load the bibliometrix object
+load(file = "./data/bib_01.RData") #load the bibliometrix object
+load(file = "./data/bib_11.RData") #load the bibliometrix object
 
-head(bib$DE) #check data
-words_total_DE <- bib$DE #assign data
-words_total_DE <- unlist(strsplit(words_total_DE, ";")) #split the records into individual keywords
-words_total_DE <- words_total_DE[order(words_total_DE)] #order alphabetically
-words_total_DE <- gsub("^\\s+|\\s+$", "", words_total_DE) #trim white space
-word_table_total_DE <- table(words_total_DE) #determine frequency of words
-word_table_total_DE <- as.data.frame(word_table_total_DE) #transform to df
-word_table_total_DE$Keyword = word_table_total_DE$words_total_DE
-word_table_total_DE <- word_table_total_DE %>%
-  select(Keyword, Freq)
+bib.71 <- bib.71 %>%
+  mutate(stage = "early") %>%
+  dplyr::select(DE, ID, stage)
 
-#rename words_total to keyword, and then merge ID and DE datasets, adding up totals for duplicate words
+bib.01 <- bib.01 %>%
+  mutate(stage = "mid") %>%
+  dplyr::select(DE, ID, stage)
 
-head(bib$ID) #check data
-words_total_ID <- bib$ID #assign data
-words_total_ID <- unlist(strsplit(words_total_ID, ";")) #split the records into individual keywords
-words_total_ID <- words_total_ID[order(words_total_ID)] #order alphabetically
-words_total_ID <- gsub("^\\s+|\\s+$", "", words_total_ID) #trim white space
-word_table_total_ID <- table(words_total_ID) #determine frequency of words
-word_table_total_ID <- as.data.frame(word_table_total_ID) #transform to df
-word_table_total_ID$Keyword = word_table_total_ID$words_total_ID
-word_table_total_ID <- word_table_total_ID %>%
-  select(Keyword, Freq)
+bib.11 <- bib.11 %>%
+  mutate(stage = "recent") %>%
+  dplyr::select(DE, ID, stage)
 
-word_table_total <- 
-  rbind(word_table_total_DE, word_table_total_ID) #append author words to journal words
+# bib <- rbind(bib.71, bib.01, bib.11)
 
-keywords <- word_table_total %>%
-  group_by(Keyword) %>% #find duplicate matches
+#early
+
+      head(bib.71$DE) #check data
+      early_DE <- bib.71$DE #assign data
+      early_DE <- unlist(strsplit(early_DE, ";")) #split the records into individual keywords
+      early_DE <- early_DE[order(early_DE)] #order alphabetically
+      early_DE <- gsub("^\\s+|\\s+$", "", early_DE) #trim white space
+      table_early_DE <- table(early_DE) #determine frequency of words
+      table_early_DE <- as.data.frame(table_early_DE) #transform to df
+      table_early_DE$Keyword = table_early_DE$early_DE
+      early_DE <- table_early_DE %>%
+        select(Keyword, Freq)
+      
+      #rename early to keyword, and then merge ID and DE datasets, adding up totals for duplicate words
+      
+      head(bib.71$ID) #check data
+      early_ID <- bib.71$ID #assign data
+      early_ID <- unlist(strsplit(early_ID, ";")) #split the records into individual keywords
+      early_ID <- early_ID[order(early_ID)] #order alphabetically
+      early_ID <- gsub("^\\s+|\\s+$", "", early_ID) #trim white space
+      table_early_ID <- table(early_ID) #determine frequency of words
+      table_early_ID <- as.data.frame(table_early_ID) #transform to df
+      table_early_ID$Keyword = table_early_ID$early_ID
+      early_ID <- table_early_ID %>%
+        select(Keyword, Freq)
+      
+      keyword_early <- 
+        rbind(early_DE, early_ID) #append author words to journal words
+      keyword_early <- keyword_early %>%
+        mutate(stage="early")
+      
+#mid
+
+      head(bib.01$DE) #check data
+      mid_DE <- bib.01$DE #assign data
+      mid_DE <- unlist(strsplit(mid_DE, ";")) #split the records into individual keywords
+      mid_DE <- mid_DE[order(mid_DE)] #order alphabetically
+      mid_DE <- gsub("^\\s+|\\s+$", "", mid_DE) #trim white space
+      table_mid_DE <- table(mid_DE) #determine frequency of words
+      table_mid_DE <- as.data.frame(table_mid_DE) #transform to df
+      table_mid_DE$Keyword = table_mid_DE$mid_DE
+      mid_DE <- table_mid_DE %>%
+        select(Keyword, Freq)
+      
+      #rename mid to keyword, and then merge ID and DE datasets, adding up totals for duplicate words
+      
+      head(bib.01$ID) #check data
+      mid_ID <- bib.01$ID #assign data
+      mid_ID <- unlist(strsplit(mid_ID, ";")) #split the records into individual keywords
+      mid_ID <- mid_ID[order(mid_ID)] #order alphabetically
+      mid_ID <- gsub("^\\s+|\\s+$", "", mid_ID) #trim white space
+      table_mid_ID <- table(mid_ID) #determine frequency of words
+      table_mid_ID <- as.data.frame(table_mid_ID) #transform to df
+      table_mid_ID$Keyword = table_mid_ID$mid_ID
+      mid_ID <- table_mid_ID %>%
+        select(Keyword, Freq)
+      
+      keyword_mid <- 
+        rbind(mid_DE, mid_ID) #append author words to journal words
+      keyword_mid <- keyword_mid %>%
+        mutate(stage="mid")
+      
+#recent
+
+      head(bib.11$DE) #check data
+      recent_DE <- bib.11$DE #assign data
+      recent_DE <- unlist(strsplit(recent_DE, ";")) #split the records into individual keywords
+      recent_DE <- recent_DE[order(recent_DE)] #order alphabetically
+      recent_DE <- gsub("^\\s+|\\s+$", "", recent_DE) #trim white space
+      table_recent_DE <- table(recent_DE) #determine frequency of words
+      table_recent_DE <- as.data.frame(table_recent_DE) #transform to df
+      table_recent_DE$Keyword = table_recent_DE$recent_DE
+      recent_DE <- table_recent_DE %>%
+        select(Keyword, Freq)
+      
+      #rename recent to keyword, and then merge ID and DE datasets, adding up totals for duplicate words
+      
+      head(bib.11$ID) #check data
+      recent_ID <- bib.11$ID #assign data
+      recent_ID <- unlist(strsplit(recent_ID, ";")) #split the records into individual keywords
+      recent_ID <- recent_ID[order(recent_ID)] #order alphabetically
+      recent_ID <- gsub("^\\s+|\\s+$", "", recent_ID) #trim white space
+      table_recent_ID <- table(recent_ID) #determine frequency of words
+      table_recent_ID <- as.data.frame(table_recent_ID) #transform to df
+      table_recent_ID$Keyword = table_recent_ID$recent_ID
+      recent_ID <- table_recent_ID %>%
+        select(Keyword, Freq)
+      
+      keyword_recent <- 
+        rbind(recent_DE, recent_ID) #append author words to journal words
+      keyword_recent <- keyword_recent %>%
+        mutate(stage="recent")
+      
+keyword_total <- rbind(keyword_early, keyword_mid, keyword_recent)
+
+keywords <- keyword_total %>%
+  group_by(Keyword, stage) %>% #find duplicate matches
   mutate(Total=sum(Freq)) %>% #add duplicate occurrences
            ungroup() %>%
   select(-Freq) %>%
   distinct()
 
-write.csv(keywords, "data/keywords_total.csv", row.names = FALSE) #save this data frame as a csv file
+keyword_code <- read.csv(file="data/word_code.csv", 
+                         header=T, sep=",")
+
+keyword_code <- keyword_code %>%
+  dplyr::select(Keyword, Code)
+
+t <- left_join(keywords, keyword_code, by = "Keyword")
+
+tt <- t %>%
+  filter(Code != "") %>%
+  filter(Code != "n" & Code != "u") %>%
+  group_by(Code, stage) %>%
+  summarise(sum = sum(Total))
+
+ggplot(tt, aes(Code, sum, fill = stage)) +
+  geom_col()
+         
+
+word_code <- t %>%
+  dplyr::select(Keyword, Total, Code) %>%
+  group_by(Keyword) %>% #find duplicate matches
+  mutate(Total=sum(Total)) %>% #add duplicate occurrences
+           ungroup() %>%
+  distinct()
+
+write.csv(word_code, "data/word_code.csv", row.names = FALSE) #save this data frame as a csv file
 
 #rename the count to freq for the wordcloud
 colnames(keywords)[colnames(keywords) == "Keyword"] <- "word" #rename for wordcloud2
@@ -138,4 +252,36 @@ keywords <- keywords %>% dplyr::filter(freq>2) #remove low values
  #writing wordcloud graphic
   wc_total <- wordcloud2(keywords, shape='rectangle')
   wc_total
+```
+
+```{r setup-topics}
+# load(file = "./data/bib.RData") #load the bibliometrix object
+
+class(bib.71)
+
+NetMatrix <- biblioNetwork(bib.71, n=100, analysis = "co-occurrences", network = "author_keywords", sep = ";") #create keyword network
+net <- networkPlot(NetMatrix, normalize="association", n = 30, Title = "Keyword Co-occurrences", type = "fruchterman", size.cex=TRUE, size=20, remove.multiple=F, edgesize = 10, edges.min=2) #plot keyword networks
+net
+
+sources <- NetMatrix@Dimnames[[1]]
+destinations <- NetMatrix@Dimnames[[2]]
+
+x <- NetMatrix@x
+
+class(net1)
+
+node_list <- tibble(id = net1)
+edge_list <- tibble(from = c(1, 2, 2, 3, 4), to = c(2, 3, 4, 2, 1))
+
+str(NetMatrix)
+
+
+ggnet2(NetMatrix)
+
+# https://www.jessesadler.com/post/network-analysis-with-r/
+#creating node and edge lists
+
+
+#https://briatte.github.io/ggnet/ #network objects in ggplot
+#ggnet places nodes using "fruchterman-reingold" by default
 ```

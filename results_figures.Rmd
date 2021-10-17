@@ -18,7 +18,7 @@ library(forcats) #working with factors
 library(tidyverse) #manipulating data
 library(knitr) #rmarkdown functions
 #library(kableExtra) #table layouts
-library(magick) #image processing
+# library(magick) #image processing
 library(stats) #R stats functions
 library(broom) #create summaries from stats objects
 library(car) #lm regress
@@ -27,7 +27,7 @@ library(lme4) #glmer function
 library(DHARMa) #testing model diagnostics
 library(glmmTMB) #fit zero-inflated negative binomial
 library(mvabund) #for multivariate stats
-library(gllvm) #for multivariate abundance
+# library(gllvm) #for multivariate abundance
 library(lattice) #fourth corner heatmap
 library(vegan)
 ```
@@ -123,19 +123,30 @@ knitr::include_graphics("images/Sites.svg")
 ```{r top-items-lollipop}
 top_lol <- site_select 
 
-#state variables to rename
-top20 <- c("F2", "F6", "G1", "M10", "F7", "Z2", "Z5", "C1", "BP3", "S2", "H10", "G4", "R5", "T5", "F3", "S6", "C2", "Z4", "S7", "H6") 
+#Abundance data
+  #Filter for top items
+top20 <- site_select %>%
+  group_by(Label) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(20, sum)
+
+#create vector from top 10 items
+top20 <- top20$Label
+top20 <- unlist(top20)
+site_select_top20 <- site_select %>%
+  filter(Label %in% top20)
 
 get_mean <- site_select %>%
-  filter(ID %in% top20) %>%
+  filter(Label %in% top20) %>%
   group_by(Habitat, Label) %>%
   summarise(sum=sum(Total)) %>%
   spread(Habitat, sum) %>%
   rowwise() %>% 
-  mutate( mean = mean(c(P,SS) ))
+  mutate( mean = mean(c(Pier, Sediment) ))
 
 top_lol <- site_select %>%
-  filter(ID %in% top20) %>%
+  filter(Label %in% top20) %>%
   group_by(Habitat, ID, Label) %>%
   summarise(sum=sum(Total)) %>%
   left_join( get_mean, by="Label") %>%
@@ -143,15 +154,15 @@ top_lol <- site_select %>%
   Label=fct_reorder( Label, mean, .desc=TRUE)) %>%
   ungroup()
 
-HabitatLabs <- c(P = "Pier", SS = "Sediment")
-top_lol$Habitat[top_lol$Habitat == "P"] <-"Pier"
-top_lol$Habitat[top_lol$Habitat == "SS"] <-"Sediment"
+# HabitatLabs <- c(P = "Pier", SS = "Sediment")
+# top_lol$Habitat[top_lol$Habitat == "P"] <-"Pier"
+# top_lol$Habitat[top_lol$Habitat == "SS"] <-"Sediment"
 
 p_top_lol <- top_lol %>% 
   ungroup() %>%
   mutate(Label=as.factor(Label),
   Label=fct_reorder(Label, mean)) %>%
-  dplyr::select(-P, -SS) %>%
+  dplyr::select(-Pier, -Sediment) %>%
   ggplot( aes(x=sum, y=Label)) +
   scale_x_log10() +
   geom_linerange( aes(xmin=0, xmax=sum, y=Label, colour=Habitat), position=position_dodge(.5)) +
@@ -800,129 +811,270 @@ options(scipen = 999)
         dev.off()
 ```
 
-## Ordination
-```{r vegan}
+<<<<<<< HEAD
+=======
 
-#Abundance data
-  #Filter for top items
-top10 <- site_select %>%
-  group_by(Label) %>%
-  summarise(sum=sum(Total)) %>%
-  arrange(desc(sum)) %>%
-  top_n(10, sum)
+## Testing non-fishing related debris
+```{r glm-nonfish, warning=FALSE, message=FALSE}
+#create df to use for models
+mod_nonfish <- site_select %>%
+  filter(Fishing=="Non-Fishing") %>% #nonfishing debris
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) %>%
+  ungroup() %>%
+              mutate(Location = as.factor(Location),
+         Habitat = as.factor(Habitat))
 
-#create vector from top 10 items
-top10 <- top10$Label
-top10 <- unlist(top10)
-site_select_top10 <- site_select %>%
-  filter(Label %in% top10)
+m_nonfish  <- glmmTMB(Total ~ #Debris count
+                 Habitat * DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_nonfish)
 
-  #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select_top10 %>%
-    mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, Location, Habitat, Date, Label) %>% 
-    summarise(sum=sum(Total)) %>% #total of each item type per survey event
-  group_by(Label) %>%
-  filter(sum>0) %>% #filter IDs that have no values across all surveys
-  ungroup()
-  
-  #convert to data wide
-  abund <- spread(abund_long, Label, sum) 
-  
-  #replace na values with 0
-  abund[is.na(abund)] <- 0
-  
-  #convert survey event to rowname
-  length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
-  abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
-  
-  com <- abund[4:13]
-  
-  ord <- metaMDS(com)
-  
-  ord$stress
-  # 0.1419583
-  
-  data.scores <- as.data.frame(scores(ord)) #create df of ord points
-  data.scores$Location <- abund$Location
-  data.scores$Habitat <- abund$Habitat
-  data.scores <- data.scores %>%
-    mutate(Habitat = as.factor(Habitat),
-           Location = as.factor(Location))
-  
-  species.scores <- as.data.frame(scores(ord, "species"))
-  species.scores$item <- rownames(species.scores) #create item id column
-  
-#create ellipsis
-#add group column to data.scores
-NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.scores$Habitat)
- veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
-  {
-    theta <- (0:npoints) * 2 * pi/npoints
-    Circle <- cbind(cos(theta), sin(theta))
-    t(center + scale * t(Circle %*% chol(cov)))
-  }
-  df_ell <- data.frame()
-  for(g in levels(NMDS$group)){
-    df_ell <- rbind(df_ell, cbind(as.data.frame(with(NMDS[NMDS$group==g,],
-                    veganCovEllipse(cov.wt(cbind(NMDS1,NMDS2),wt=rep(1/length(NMDS1),length(NMDS1)))$cov,center=c(mean(NMDS1),mean(NMDS2)))))
-                    ,group=g))
-  }
+library(emmeans)
+emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)))
 
-  p_ord <- ggplot() +
-  # geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
-  geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
-            size=1, linetype=2) +
-  geom_point(data=data.scores, 
-             aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
-  coord_equal() +
+#pier diff 3.05 - 4.28 (-1.23) at 1km, 2.94 - 4.06 (-1.12) at 8km
+#sedi diff 1.22 - 3.14 (-1.92) at 1km, 1.91 - 3.43 (-1.52) at 8km
+
+# DistKm = 1:
+#  contrast estimate    SE df t.ratio p.value
+#  P - SS      1.486 0.540 29 2.751   0.0101 
+# 
+# DistKm = 8:
+#  contrast estimate    SE df t.ratio p.value
+#  P - SS      0.829 0.441 29 1.877   0.0705 
+
+# Predictors for non-fishing related debris are: Habitat
+
+nd_nonfish <- expand.grid(Habitat = unique(mod_nonfish$Habitat),
+                          DistKm = seq(from = min(mod_nonfish$DistKm),
+                               to = max(mod_nonfish$DistKm),
+                               length=1000),
+                  Location = NA,
+                  Date = NA)
+
+
+pred_nonfish <- predict(object = m_nonfish,
+                         newdata = nd_nonfish,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_nonfish$Total <- pred_nonfish$fit
+nd_nonfish$SE_upper <- pred_nonfish$fit + pred_nonfish$se.fit
+nd_nonfish$SE_lower <- pred_nonfish$fit - pred_nonfish$se.fit
+
+
+p_nonfish <- ggplot(nd_nonfish, aes(y=Total, x=DistKm)) + 
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
    theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
         panel.background = element_blank())
-  
-  p_ord
 
-# svg("images/p_ord.svg", height=7, width=11)
-# plot(p_ord, height=7, width=11, units="in")
-# dev.off()
+p_nonfish
 
-  p_ord_txt <- ggplot() +
-  geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
-            size=1, linetype=2) +
-  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
-  geom_point(data=data.scores, 
-             aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
-  coord_equal() +
-   theme(legend.position = "none",
-        panel.background = element_blank())
-  
-p_ord_txt
 
-# svg("images/p_ord_txt.svg", height=7, width=11)
-# plot(p_ord_txt, height=7, width=11, units="in")
+
+# ggsave(filename = "images/p_nonfish.svg", plot = p_nonfish, device="svg", height=7, width=7, units="in")
+
+svg("images/p_nonfish.svg")
+plot(p_nonfish, height=7, width=7, units="in")
+dev.off()
+
+```
+
+# glm plastic
+```{r glm-plastic, warning=FALSE, message=FALSE}
+#create df of all plastic materials
+mod_plas <- site_select %>%
+  filter(Material=="Plastic") %>% 
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+#GLM negative binomial with two variables and zero inflation
+m_plas  <- glmmTMB(Total ~ #Debris count
+                 Habitat*DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_plas) 
+
+# Predictors for plastic are: Habitat, DistKm
+
+nd_plas <- expand.grid(Habitat = unique(mod_plas$Habitat),
+                          DistKm = seq(from = min(mod_plas$DistKm),
+                               to = max(mod_plas$DistKm),
+                               length=1000),
+                  Location = NA,
+                  Date = NA)
+
+pred_plas <- predict(object = m_plas,
+                         newdata = nd_plas,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_plas$Total <- pred_plas$fit
+nd_plas$SE_upper <- pred_plas$fit + pred_plas$se.fit
+nd_plas$SE_lower <- pred_plas$fit - pred_plas$se.fit
+
+#plot the predicted means
+
+p_plas <- ggplot(nd_plas, aes(y=Total, x=DistKm)) +
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymax = SE_upper, ymin = SE_lower, fill=Habitat), alpha=0.2) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank()) 
+
+p_plas
+
+# ggsave(filename = "images/p_plas.svg", plot = p_plas, device="svg", height=7, width=7, units="in")
+
+# svg("images/p_plas.svg")
+# plot(p_plas, height=7, width=7, units="in")
 # dev.off()
 
 ```
+# glm glass
+```{r glm-glsmat, warning=FALSE, message=FALSE}
+#create df of all misc materials
+mod_gls <- site_select %>%
+  filter(Material=="Glass") %>% #glass
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+
+m_gls  <- glmmTMB(Total ~ #Debris count
+                 Habitat*DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_gls)
+
+# Predictors for 'other' materials are: Habitat, Coast
+
+nd_gls <- expand.grid(Habitat = unique(mod_gls$Habitat),
+                      DistKm = seq(from = min(mod_gls$DistKm),
+                               to = max(mod_gls$DistKm),
+                               length=1000),
+                  Location = NA,
+                  Date = NA)
+
+pred_gls <- predict(object = m_gls,
+                         newdata = nd_gls,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_gls$Total <- pred_gls$fit
+nd_gls$SE_upper <- pred_gls$fit + pred_gls$se.fit
+nd_gls$SE_lower <- pred_gls$fit - pred_gls$se.fit
+
+#plot the predicted means
+
+p_gls <- ggplot(nd_gls, aes(y=Total, x=DistKm)) +
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) 
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank())
+
+p_gls
+
+# ggsave(filename = "images/p_gls.svg", plot = p_gls, device="svg", height=7, width=7, units="in")
+
+svg("images/p_gls.svg")
+plot(p_gls, height=7, width=7, units="in")
+dev.off()
+
+```
+
+
+# glm metal
+```{r glm-metmat, warning=FALSE, message=FALSE}
+#create df of all misc materials
+mod_met <- site_select %>%
+  filter(Material=="Metal") %>% #glass
+  group_by(Date, Location, Habitat, DistKm) %>% #relevant variables
+  summarise(Total=sum(Total)) 
+
+# #GLM negative binomial with two variables and zero inflation
+m_met  <- glmmTMB(Total ~ #Debris count
+                 Habitat*DistKm + #predicted by Habitat
+                 (1|Location) + (1|Date), #site/date random effect
+               family=nbinom1(), #negative binomial to deal with count data and zeros
+               data = mod_met)
+
+# Predictors for 'other' materials are: Habitat, Coast
+
+nd_met <- expand.grid(Habitat = unique(mod_met$Habitat),
+                      DistKm = seq(from = min(mod_met$DistKm),
+                               to = max(mod_met$DistKm),
+                               length=1000),
+                  Location = NA,
+                  Date = NA)
+
+pred_met <- predict(object = m_met,
+                         newdata = nd_met,
+                         se.fit = T,
+                         re.form = NA,
+                         type="response")
+
+nd_met$Total <- pred_met$fit
+nd_met$SE_upper <- pred_met$fit + pred_met$se.fit
+nd_met$SE_lower <- pred_met$fit - pred_met$se.fit
+
+#plot the predicted means
+
+p_met <- ggplot(nd_met, aes(y=Total, x=DistKm)) +
+  geom_line(aes(col=Habitat)) +
+  geom_ribbon(aes(ymin=SE_lower, ymax=SE_upper, fill=Habitat), alpha=0.2) +
+  ylim(0, 40)
+   # theme(legend.position = "none",
+   #      panel.grid = element_blank(),
+   #      axis.title = element_blank(),
+   #      axis.text = element_blank(),
+   #      panel.background = element_blank())
+
+p_met
+
+svg("images/p_met.svg")
+plot(p_met, height=7, width=7, units="in")
+dev.off()
+
+# ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
+```
+
+
+>>>>>>> 0b89c072dc0ea9003811682ced91cf2830605bd5
+## Ordination
+
 
 ```{r vegan-20}
 
 #Abundance data
-#   #Filter for top items
-# top20 <- site_select %>%
-#   group_by(Label) %>%
-#   summarise(sum=sum(Total)) %>%
-#   arrange(desc(sum)) %>%
-#   top_n(20, sum)
-# 
-# #create vector from top 20 items
-# top20 <- top20$Label
-# top20 <- unlist(top20)
-site_select_top20 <- site_select %>%
-  filter(ID %in% top20)
+  #Filter for top items
+top20 <- site_select %>%
+  group_by(Label) %>%
+  summarise(sum=sum(Total)) %>%
+  arrange(desc(sum)) %>%
+  top_n(20, sum)
+
+ #create vector from top 20 items
+ top20 <- top20$Label
+ top20 <- unlist(top20)
 
   #create abundance dataframe with ID as columns and survey events as rows
-  abund_long <- site_select_top20 %>%
+  abund_long <- site_select %>%
     mutate(survey_event=paste0(Date, Site)) %>% #create column for unique survey event
-    group_by(survey_event, Location, Habitat, Date, Label) %>% 
+    group_by(survey_event, DistKm, Habitat, Date, Label) %>% 
     summarise(sum=sum(Total)) %>% #total of each item type per survey event
   group_by(Label) %>%
   filter(sum>0) %>% #filter IDs that have no values across all surveys
@@ -938,22 +1090,28 @@ site_select_top20 <- site_select %>%
   length(unique(abund$survey_event)) == nrow(abund) #checking for duplicates
   abund <- column_to_rownames(abund, var="survey_event") #create rownames from survey event
   
-  com <- abund[4:23]
+  com <- abund[4:64]
+  env <- abund[1:2]
   
   ord <- metaMDS(com)
   
   ord$stress 
-  #0.167787
+  #0.1977957
+  
+  # https://jkzorz.github.io/2020/04/04/NMDS-extras.html
+  en = envfit(ord, env, permutations = 999, na.rm = TRUE)
+  en
+  
+en_coord_cont = as.data.frame(scores(en, "vectors")) * ordiArrowMul(en)
+en_coord_cat = as.data.frame(scores(en, "factors")) * ordiArrowMul(en)
   
   data.scores <- as.data.frame(scores(ord)) #create df of ord points
-  data.scores$Location <- abund$Location
+  data.scores$DistKm <- abund$DistKm
   data.scores$Habitat <- abund$Habitat
-  data.scores <- data.scores %>%
-    mutate(Habitat = as.factor(Habitat),
-           Location = as.factor(Location))
   
   species.scores <- as.data.frame(scores(ord, "species"))
   species.scores$item <- rownames(species.scores) #create item id column
+
 
 #create ellipsis
 #add group column to data.scores
@@ -977,6 +1135,12 @@ NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.sco
              aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
   geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
             size=1, linetype=2) +
+    # geom_segment(aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2), 
+    #    data = en_coord_cont, size =1, alpha = 0.5, colour = "grey30") +
+    #  geom_text(data = en_coord_cat, aes(x = NMDS1, y = NMDS2+0.04), 
+    #    label = row.names(en_coord_cat), colour = "navy", fontface = "bold") + 
+    #  geom_text(data = en_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30", 
+    #    fontface = "bold", label = row.names(en_coord_cont)) + 
   coord_equal() +
    theme(legend.position = "none",
         panel.background = element_blank())
@@ -987,8 +1151,11 @@ svg("images/p_ord.svg", height=7, width=11)
 plot(p_ord, height=7, width=11, units="in")
 dev.off()
 
+ txt20 <- species.scores %>%
+   filter(item %in% top20)
+
   p_ord_txt <- ggplot() +
-  geom_text(data=species.scores,aes(x=NMDS1,y=NMDS2, label=item)) +
+  geom_text(data=txt20,aes(x=NMDS1,y=NMDS2, label=item)) +
   geom_point(data=data.scores, 
              aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
   geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
@@ -1002,6 +1169,44 @@ dev.off()
 # svg("images/p_ord_txt.svg", height=7, width=11)
 # plot(p_ord_txt, height=7, width=11, units="in")
 # dev.off()
+
+```
+
+```{r adonis-pairwise, warning=FALSE, message=FALSE}
+# https://jkzorz.github.io/2020/04/04/NMDS-extras.html
+
+#Both hab and dist are significant, as is the interaction
+df.adonis <- adonis(com ~ data.scores$Habitat*data.scores$DistKm, permutations=999, method="bray")
+df.adonis
+
+# https://search.r-project.org/CRAN/refmans/vegan/html/permutest.betadisper.html
+
+#testing habitat dispersion
+df.dis <- vegdist(com, method = "bray") # make a distance matrix
+df.betadisper.hab <- betadisper(df.dis, data.scores$Habitat) # test dispersion
+df.betadisper.hab
+perm.hab <- permutest(df.betadisper.hab) 
+#testing dist dispersion
+df.dis <- vegdist(com, method = "bray") # make a distance matrix
+df.betadisper.dist <- betadisper(df.dis, data.scores$DistKm) # test dispersion
+df.betadisper.dist
+perm.dist <- permutest(df.betadisper.dist) 
+
+## Tukey's Honest Significant Differences
+TKhab <- TukeyHSD(df.betadisper.hab)
+plot(TKhab)
+
+TKdist <- TukeyHSD(df.betadisper.dist)
+plot(TKdist)
+
+
+pstat.hab <- permustats(perm.hab)
+densityplot(pstat.hab, scales = list(x = list(relation = "free")))
+qqmath(pstat.hab, scales = list(relation = "free"))
+
+pstat.dist <- permustats(perm.dist)
+densityplot(pstat.dist, scales = list(x = list(relation = "free")))
+qqmath(pstat.dist, scales = list(relation = "free"))
 
 ```
 ## gllvm analysis
