@@ -259,20 +259,63 @@ keywords <- keywords %>% dplyr::filter(freq>2) #remove low values
 load(file = "./data/bib_71.RData") #load the bibliometrix object
 
 
-NetMatrix <- biblioNetwork(bib.71, n=100, analysis = "co-occurrences", network = "author_keywords", sep = ";") #create keyword network
-net <- networkPlot(NetMatrix, normalize="association", n = 30, Title = "Keyword Co-occurrences", type = "fruchterman", size.cex=TRUE, size=20, remove.multiple=F, edgesize = 10, edges.min=2) #plot keyword networks
-net
+NetMatrix <- biblioNetwork(bib.71, n=20, analysis = "co-occurrences", network = "author_keywords", sep = ";") #create keyword network
+# net <- networkPlot(NetMatrix, normalize="association", n = 30, Title = "Keyword Co-occurrences", type = "fruchterman", size.cex=TRUE, size=20, remove.multiple=F, edgesize = 10, edges.min=2) #plot keyword networks
+# net
 
+#from sparse matrix to adjacency matrix
 net <- as.matrix(NetMatrix)
 
+nodes <- as.data.frame(net) %>%
+  rownames_to_column("label") %>%
+  mutate(id = row_number()) %>%
+  dplyr::select(id, label)
+
+library(dplyr)
+library(tidyr)
+per_route <-as.data.frame(net) %>%
+    rownames_to_column("From") %>%
+    gather(key="To", value="Weight", 2:21) %>% 
+    arrange(From, To)
+
+
+#remove self comparisons
+per_route <- subset(per_route, From != To)
+
+edges <- per_route %>% 
+  left_join(nodes, by = c("From" = "label")) %>% 
+  rename(from = id)
+
+edges <- edges %>% 
+  left_join(nodes, by = c("To" = "label")) %>% 
+  rename(to = id) %>%
+  select(from, to, Weight)
+
 library(igraph)
-g <- graph.adjacency(net)
-edgelist <- get.edgelist(g)
+routes_igraph <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
+plot(routes_igraph, edge.arrow.size = 0.2)
 
-sankeyNetwork(Links = x, Nodes = sources)
+ggraph(routes_igraph, layout = "linear") + 
+  geom_edge_arc(aes(width = Weight), alpha = 0.8) + 
+  scale_edge_width(range = c(0.2, 2)) +
+  geom_node_text(aes(label = label)) +
+  labs(edge_width = "Weight") +
+  theme_graph()
+
+# better arc diagram https://www.data-to-viz.com/graph/arc.html order of nodes is important
+
+#Sankey
+nodes_d3 <- mutate(nodes, id = id - 1)
+edges_d3 <- mutate(edges, from = from - 1, to = to - 1)
+
+forceNetwork(Links = edges_d3, Nodes = nodes_d3, Source = "from", Target = "to", 
+             NodeID = "label", Group = "id", Value = "Weight", 
+             opacity = 1, fontSize = 16, zoom = TRUE)
+
+sankeyNetwork(Links = edges_d3, Nodes = nodes_d3, Source = "from", Target = "to", 
+              NodeID = "label", Value = "Weight", fontSize = 16, unit = "")
 
 
-ggnet2(NetMatrix)
 
 # https://www.jessesadler.com/post/network-analysis-with-r/
 #creating node and edge lists
@@ -280,23 +323,193 @@ ggnet2(NetMatrix)
 
 #https://briatte.github.io/ggnet/ #network objects in ggplot
 #ggnet places nodes using "fruchterman-reingold" by default
+
+# https://kateto.net/network-visualization
+```
+```{r arc-early}
+#https://www.data-to-viz.com/graph/arc.html
+
+load(file = "./data/bib_71.RData") #load the bibliometrix object
+
+      #create sparse matrix
+      NetMatrix <- biblioNetwork(bib.71, n=50, analysis = "co-occurrences", network = "author_keywords", sep = ";")
+      
+      #from sparse matrix to adjacency matrix
+      net <- as.matrix(NetMatrix)
+      
+      #adjacency matrix to long form
+      connect <- as.data.frame(net) %>%
+        rownames_to_column("from") %>%
+        gather(key = "to", value = "value", -1) %>%
+        na.omit()
+      
+      connect <- subset(connect, from != to)
+      connect <- subset(connect, value != 0)
+      
+      # Number of connection per person
+      c( as.character(connect$from), as.character(connect$to)) %>%
+        as.tibble() %>%
+        group_by(value) %>%
+        summarize(n=n()) -> keywords
+      colnames(keywords) <- c("word", "n")
+    
+      
+      # Create a graph object with igraph
+      mygraph <- graph_from_data_frame( connect, vertices = keywords, directed = FALSE )
+      
+      # Find community
+      com <- walktrap.community(mygraph)
+      #max(com$membership)
+      
+      keywords <- keywords %>% 
+  mutate( grp = com$membership) %>%
+  arrange(grp) %>%
+  mutate(word=factor(word, word))
+      
+    
+      
+  #     #keep only 10 first communities (not relevant here)
+  #     keywords <- keywords %>% 
+  # filter(grp<16)
+      
+      mygraph <- graph_from_data_frame( connect, vertices = keywords, directed = FALSE )
+      
+      mygraph
+      
+      # prepare a vector of n color in the viridis scale
+mycolor <- colormap(colormap=colormaps$viridis, nshades=max(keywords$grp))
+mycolor <- sample(mycolor, length(mycolor))
+      
+ggraph(mygraph, layout="linear") + 
+  geom_edge_arc(edge_colour="black", edge_alpha=0.2, edge_width=0.3, fold=TRUE) +
+  geom_node_point(aes(size=n, color=as.factor(grp), fill=grp), alpha=0.5) +
+  scale_size_continuous(range=c(0.5,8)) +
+  scale_color_manual(values=mycolor) +
+  geom_node_text(aes(label=name), angle=65, hjust=1, nudge_y = -1.1, size=2.3) +
+  theme_void() +
+  theme(
+    legend.position="none",
+    plot.margin=unit(c(0,0,0.4,0), "null"),
+    panel.spacing=unit(c(0,0,3.4,0), "null")
+  ) +
+  expand_limits(x = c(-1.2, 1.2), y = c(-5.6, 1.2))
+
+# need to determine a better order for nodes
+# weighted arcs https://www.r-bloggers.com/2013/02/arc-diagrams-in-r-les-miserables/
+#remove dud words like 'marine pollution'
+```
+```{r arc-recent}
+#https://www.data-to-viz.com/graph/arc.html
+
+load(file = "./data/bib_11.RData") #load the bibliometrix object
+
+      #create sparse matrix
+      NetMatrix <- biblioNetwork(bib.11, n=50, analysis = "co-occurrences", network = "author_keywords", sep = ";")
+      
+      #from sparse matrix to adjacency matrix
+      net <- as.matrix(NetMatrix)
+      
+      #adjacency matrix to long form
+      connect <- as.data.frame(net) %>%
+        rownames_to_column("from") %>%
+        gather(key = "to", value = "value", -1) %>%
+        na.omit()
+      
+      connect <- subset(connect, from != to)
+      connect <- subset(connect, value != 0)
+      
+      # Number of connection per person
+      c( as.character(connect$from), as.character(connect$to)) %>%
+        as.tibble() %>%
+        group_by(value) %>%
+        summarize(n=n()) -> keywords
+      colnames(keywords) <- c("word", "n")
+      
+      # Create a graph object with igraph
+      mygraph <- graph_from_data_frame( connect, vertices = keywords, directed = FALSE )
+      
+      # Find community
+      com <- walktrap.community(mygraph)
+      #max(com$membership)
+      
+      keywords <- keywords %>% 
+  mutate( grp = com$membership) %>%
+  arrange(grp) %>%
+  mutate(word=factor(word, word))
+      
+  #     #keep only 10 first communities (not relevant here)
+  #     keywords <- keywords %>% 
+  # filter(grp<16)
+      
+      mygraph <- graph_from_data_frame( connect, vertices = keywords, directed = FALSE )
+      
+      mygraph
+      
+      # prepare a vector of n color in the viridis scale
+mycolor <- colormap(colormap=colormaps$viridis, nshades=max(keywords$grp))
+mycolor <- sample(mycolor, length(mycolor))
+      
+ggraph(mygraph, layout="linear") + 
+  geom_edge_arc(edge_colour="black", edge_alpha=0.2, edge_width=0.3, fold=TRUE) +
+  geom_node_point(aes(size=n, color=as.factor(grp), fill=grp), alpha=0.5) +
+  scale_size_continuous(range=c(0.5,8)) +
+  scale_color_manual(values=mycolor) +
+  geom_node_text(aes(label=name), angle=65, hjust=1, nudge_y = -1.1, size=2.3) +
+  theme_void() +
+  theme(
+    legend.position="none",
+    plot.margin=unit(c(0,0,0.4,0), "null"),
+    panel.spacing=unit(c(0,0,3.4,0), "null")
+  ) +
+  expand_limits(x = c(-1.2, 1.2), y = c(-5.6, 1.2))
+
+# need to determine a better order for nodes
+# weighted arcs https://www.r-bloggers.com/2013/02/arc-diagrams-in-r-les-miserables/
+#remove dud words like 'marine pollution'
 ```
 
-```{r tutorial}
-#http://www.kateto.net/wp-content/uploads/2015/06/Polnet%202015%20Network%20Viz%20Tutorial%20-%20Ognyanova.pdf
-nodes <-read.csv("data/network/Dataset1-Media-Example-NODES.csv", header=T, as.is=T)
-links <-read.csv("data/network/Dataset1-Media-Example-EDGES.csv", header=T, as.is=T)
 
-links <-aggregate(links[,3], links[,-3], sum)
-links <- links[order(links$from, links$to),]
-colnames(links)[4] <- "weight"
-rownames(links) <- NULL
+```{r}
 
-nodes2 <-read.csv("data/network/Dataset2-Media-User-Example-NODES.csv", header=T, as.is=T)
-links2 <-read.csv("data/network/Dataset2-Media-User-Example-EDGES.csv", header=T, row.names=1)
+# https://rdrr.io/github/briatte/ggnet/f/vignettes/ggnet2.Rmd
 
-links2 <-as.matrix(links2)
-dim(links2)
-dim(nodes2)
+net = network(connect, directed = TRUE)
+
+
+ggnet2(net, mode = "kamadakawai")
+
+# party affiliation
+x = data.frame(word = network.vertex.names(net))
+x = merge(x, keywords, by="word", sort = FALSE)$grp
+net %v% "group" = as.character(x)
+
+y = RColorBrewer::brewer.pal(9, "Set1")[ c(3, 1, 9, 6, 8, 5, 2) ]
+names(y) = levels(x)
+
+ggnet2(net, color = "group", palette = y, alpha = 0.75, size = 4, edge.alpha = 0.5)
+
+# party affiliation
+x = data.frame(Twitter = network.vertex.names(net))
+x = merge(x, v, by = "Twitter", sort = FALSE)$Groupe
+net %v% "party" = as.character(x)
+
+
+# root URL
+r = "https://raw.githubusercontent.com/briatte/ggnet/master/"
+
+# read nodes
+v = read.csv(paste0(r, "inst/extdata/nodes.tsv"), sep = "\t")
+names(v)
+
+# read edges
+e = read.csv(paste0(r, "inst/extdata/network.tsv"), sep = "\t")
+names(e)
+
+#e = from | to
+#v = keywords
+
 ```
+
+
+
 
