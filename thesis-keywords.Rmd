@@ -16,6 +16,7 @@ library(bibliometrix)
 library(tidyverse)
 library(data.table)
 library(dplyr)
+library(tidyr)
 #for graphing
 library(ggplot2)
 #for clean display of tables and code
@@ -25,8 +26,11 @@ library(kableExtra)
 library(ggnet)
 library(network)
 library(sna)
+library(spdep)
 # devtools::install_github("briatte/ggnet")
 library(networkD3) #sankey diagram
+library(igraph)
+library(viridis)
 ```
 
 ```{r scopus-colnames}
@@ -259,7 +263,7 @@ keywords <- keywords %>% dplyr::filter(freq>2) #remove low values
 load(file = "./data/bib_71.RData") #load the bibliometrix object
 
 
-NetMatrix <- biblioNetwork(bib.71, n=20, analysis = "co-occurrences", network = "author_keywords", sep = ";") #create keyword network
+NetMatrix <- biblioNetwork(bib.71, n=100, analysis = "co-occurrences", network = "author_keywords", sep = ";") #create keyword network
 # net <- networkPlot(NetMatrix, normalize="association", n = 30, Title = "Keyword Co-occurrences", type = "fruchterman", size.cex=TRUE, size=20, remove.multiple=F, edgesize = 10, edges.min=2) #plot keyword networks
 # net
 
@@ -271,8 +275,7 @@ nodes <- as.data.frame(net) %>%
   mutate(id = row_number()) %>%
   dplyr::select(id, label)
 
-library(dplyr)
-library(tidyr)
+
 per_route <-as.data.frame(net) %>%
     rownames_to_column("From") %>%
     gather(key="To", value="Weight", 2:21) %>% 
@@ -291,7 +294,7 @@ edges <- edges %>%
   rename(to = id) %>%
   select(from, to, Weight)
 
-library(igraph)
+
 routes_igraph <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
 plot(routes_igraph, edge.arrow.size = 0.2)
 
@@ -352,8 +355,9 @@ load(file = "./data/bib_71.RData") #load the bibliometrix object
         group_by(value) %>%
         summarize(n=n()) -> keywords
       colnames(keywords) <- c("word", "n")
-    
       
+      write.csv(keywords, "data/keywords.71.csv", row.names=T)
+    
       # Create a graph object with igraph
       mygraph <- graph_from_data_frame( connect, vertices = keywords, directed = FALSE )
       
@@ -376,7 +380,8 @@ load(file = "./data/bib_71.RData") #load the bibliometrix object
       
       mygraph
       
-      # prepare a vector of n color in the viridis scale
+      ??colormap
+      
 mycolor <- colormap(colormap=colormaps$viridis, nshades=max(keywords$grp))
 mycolor <- sample(mycolor, length(mycolor))
       
@@ -404,7 +409,7 @@ ggraph(mygraph, layout="linear") +
 load(file = "./data/bib_11.RData") #load the bibliometrix object
 
       #create sparse matrix
-      NetMatrix <- biblioNetwork(bib.11, n=50, analysis = "co-occurrences", network = "author_keywords", sep = ";")
+      NetMatrix <- biblioNetwork(bib.11, n=15, analysis = "co-occurrences", network = "author_keywords", sep = ";")
       
       #from sparse matrix to adjacency matrix
       net <- as.matrix(NetMatrix)
@@ -424,6 +429,8 @@ load(file = "./data/bib_11.RData") #load the bibliometrix object
         group_by(value) %>%
         summarize(n=n()) -> keywords
       colnames(keywords) <- c("word", "n")
+      
+      write.csv(keywords, "data/keywords.11.csv", row.names=T)
       
       # Create a graph object with igraph
       mygraph <- graph_from_data_frame( connect, vertices = keywords, directed = FALSE )
@@ -471,6 +478,9 @@ ggraph(mygraph, layout="linear") +
 
 ```{r}
 
+# https://rdrr.io/cran/spdep/f/vignettes/nb_igraph.Rmd
+#spatial weights and sparse matrices tutorial
+
 # https://rdrr.io/github/briatte/ggnet/f/vignettes/ggnet2.Rmd
 
 net = network(connect, directed = TRUE)
@@ -481,6 +491,7 @@ ggnet2(net, mode = "kamadakawai")
 # party affiliation
 x = data.frame(word = network.vertex.names(net))
 x = merge(x, keywords, by="word", sort = FALSE)$grp
+
 net %v% "group" = as.character(x)
 
 y = RColorBrewer::brewer.pal(9, "Set1")[ c(3, 1, 9, 6, 8, 5, 2) ]
