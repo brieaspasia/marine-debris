@@ -811,9 +811,6 @@ options(scipen = 999)
         dev.off()
 ```
 
-<<<<<<< HEAD
-=======
-
 ## Testing non-fishing related debris
 ```{r glm-nonfish, warning=FALSE, message=FALSE}
 #create df to use for models
@@ -830,6 +827,8 @@ m_nonfish  <- glmmTMB(Total ~ #Debris count
                  (1|Location) + (1|Date), #site random effect
                family=nbinom1(), #negative binomial to deal with count data and zeros
                data = mod_nonfish)
+
+vignette("basics", "emmeans")
 
 library(emmeans)
 emmeans(m_nonfish, pairwise~ Habitat|DistKm , at=list(DistKm=c(1,8)))
@@ -1051,12 +1050,7 @@ dev.off()
 
 # ggsave(filename = "images/p_met.svg", plot = p_met, device="svg", height=7, width=7, units="in")
 ```
-
-
->>>>>>> 0b89c072dc0ea9003811682ced91cf2830605bd5
 ## Ordination
-
-
 ```{r vegan-20}
 
 #Abundance data
@@ -1135,12 +1129,12 @@ NMDS <- data.frame(NMDS1 = ord$points[,1], NMDS2 = ord$points[,2],group=data.sco
              aes(x=NMDS1, y=NMDS2, colour=Habitat), alpha=0.8) + 
   geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2,colour=group), 
             size=1, linetype=2) +
-    # geom_segment(aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2), 
-    #    data = en_coord_cont, size =1, alpha = 0.5, colour = "grey30") +
-    #  geom_text(data = en_coord_cat, aes(x = NMDS1, y = NMDS2+0.04), 
-    #    label = row.names(en_coord_cat), colour = "navy", fontface = "bold") + 
-    #  geom_text(data = en_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30", 
-    #    fontface = "bold", label = row.names(en_coord_cont)) + 
+    geom_segment(aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2),
+       data = en_coord_cont, size =1, alpha = 0.5, colour = "grey30") +
+     geom_text(data = en_coord_cat, aes(x = NMDS1, y = NMDS2+0.04),
+       label = row.names(en_coord_cat), colour = "navy", fontface = "bold") +
+     geom_text(data = en_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30",
+       fontface = "bold", label = row.names(en_coord_cont)) +
   coord_equal() +
    theme(legend.position = "none",
         panel.background = element_blank())
